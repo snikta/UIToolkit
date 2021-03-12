@@ -9,7 +9,15 @@
 #include "LoadBitmapFromFile.h"
 #include "SafeRelease.h"
 
+#include "SlabDecomposition.h"
+
 using std::string;
+
+const wchar_t *LOut(string str) {
+	string s1 = str + "\n";
+	std::wstring widestr = std::wstring(s1.begin(), s1.end());
+	return widestr.c_str();
+}
 
 // START: https://stackoverflow.com/questions/27220/how-to-convert-stdstring-to-lpcwstr-in-c-unicode
 std::wstring s2ws(const string& s)
@@ -30,6 +38,18 @@ LPCWSTR stringToLPCWSTR(string str) {
 }
 // END: https://stackoverflow.com/questions/27220/how-to-convert-stdstring-to-lpcwstr-in-c-unicode*/
 
+class FormControl {
+public:
+	float x;
+	float y;
+	float width;
+	float height;
+
+	FormControl(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {};
+};
+
+SlabContainer *mySlabContainer = new SlabContainer;
+Region* selRegion;
 IWICImagingFactory* m_pWICFactory;
 ID2D1Bitmap* m_pBitmap;
 ID2D1HwndRenderTarget* pRenderTarget = NULL;
@@ -98,10 +118,29 @@ void SetFont(string fontName, static const float fontSize, bool bold, bool itali
 	}
 }
 
+DWRITE_TEXT_METRICS MeasureText(string text) {
+	IDWriteTextLayout* pTextLayout_ = NULL;
+	HRESULT hr = m_pDWriteFactory->CreateTextLayout(
+		LOut(text),      // The string to be laid out and formatted.
+		text.size(),  // The length of the string.
+		m_pTextFormat,  // The text format to apply to the string (contains font information, etc).
+		1366,         // The width of the layout box.
+		768,        // The height of the layout box.
+		&pTextLayout_  // The IDWriteTextLayout interface pointer.
+	);
+
+	DWRITE_TEXT_METRICS metrics;
+	pTextLayout_->GetMetrics(&metrics);
+
+	SafeRelease(&pTextLayout_);
+
+	return metrics;
+}
+
 DWRITE_TEXT_METRICS FillText(string text, float x, float y) {
 	IDWriteTextLayout* pTextLayout_ = NULL;
 	HRESULT hr = m_pDWriteFactory->CreateTextLayout(
-		stringToLPCWSTR(text),      // The string to be laid out and formatted.
+		LOut(text),      // The string to be laid out and formatted.
 		text.size(),  // The length of the string.
 		m_pTextFormat,  // The text format to apply to the string (contains font information, etc).
 		1366,         // The width of the layout box.
@@ -113,14 +152,14 @@ DWRITE_TEXT_METRICS FillText(string text, float x, float y) {
 	pTextLayout_->GetMetrics(&metrics);
 
 	pRenderTarget->DrawText(
-		stringToLPCWSTR(text),
+		LOut(text),
 		text.size(),
 		m_pTextFormat,
 		D2D1::RectF(x, y, x + metrics.widthIncludingTrailingWhitespace, y + metrics.height),
 		pFillBrush
 	);
 
-	SafeRelease(pTextLayout_);
+	SafeRelease(&pTextLayout_);
 
 	return metrics;
 }
@@ -150,15 +189,46 @@ void DrawBitmap(string src, float x, float y, float width, float height) {
 	}
 }
 
+FormControl DrawButton(string label, float x, float y) {
+	DWRITE_TEXT_METRICS metrics = MeasureText(label);
+	SetFillColor(211.0, 211.0, 211.0);
+	FillRect(x, y, 20 + metrics.width, 20 + metrics.height);
+	SetStrokeColor(0.0, 0.0, 0.0);
+	StrokeRect(x, y, 20 + metrics.width, 20 + metrics.height);
+	SetFillColor(0.0, 0.0, 0.0);
+	FillText(label, x + 10, y + 10);
+	return FormControl(x, y, 20 + metrics.width, 20 + metrics.height);
+}
+
+FormControl DrawRadioButton(string label, float x, float y) {
+	DWRITE_TEXT_METRICS metrics = MeasureText(label);
+	SetFillColor(0.0, 0.0, 0.0);
+	SetStrokeColor(0.0, 0.0, 0.0);
+	DrawBitmap("radiobutton.png", x, y, metrics.height, metrics.height);
+	FillText(label, x + metrics.height + 10, y);
+	return FormControl(x, y, metrics.height + 10 + metrics.width, metrics.height);
+}
+
+FormControl DrawCheckbox(string label, float x, float y) {
+	DWRITE_TEXT_METRICS metrics = MeasureText(label);
+	SetFillColor(0.0, 0.0, 0.0);
+	SetStrokeColor(0.0, 0.0, 0.0);
+	DrawBitmap("checkbox.png", x, y, metrics.height, metrics.height);
+	FillText(label, x + metrics.height + 10, y);
+	return FormControl(x, y, metrics.height + 10 + metrics.width, metrics.height);
+}
+
 class MainWindow : public BaseWindow<MainWindow>
 {
 	ID2D1Factory* pFactory;
-
+	bool success;
+	float slabLeft, slabRight, regionTop, regionBottom;
 	void    CalculateLayout();
 	HRESULT CreateGraphicsResources();
 	void    DiscardGraphicsResources();
 	void    OnPaint();
 	void    Resize();
+	void    OnMouseMove(int pixelX, int pixelY, DWORD flags);
 
 public:
 
@@ -182,6 +252,30 @@ void MainWindow::CalculateLayout()
 		const float radius = min(x, y);
 	}
 }
+
+class DPIScale
+{
+	static float scaleX;
+	static float scaleY;
+
+public:
+	static void Initialize(ID2D1Factory* pFactory)
+	{
+		FLOAT dpiX, dpiY;
+		pFactory->GetDesktopDpi(&dpiX, &dpiY);
+		scaleX = dpiX / 96.0f;
+		scaleY = dpiY / 96.0f;
+	}
+
+	template <typename T>
+	static D2D1_POINT_2F PixelsToDips(T x, T y)
+	{
+		return D2D1::Point2F(static_cast<float>(x) / scaleX, static_cast<float>(y) / scaleY);
+	}
+};
+
+float DPIScale::scaleX = 1.0f;
+float DPIScale::scaleY = 1.0f;
 
 HRESULT MainWindow::CreateGraphicsResources()
 {
@@ -231,11 +325,11 @@ void MainWindow::OnPaint()
 
 		pRenderTarget->BeginDraw();
 
-		pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::SkyBlue));
+		pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
 
 		hr = DemoApp::CreateDeviceIndependentResources();
 
-		SetStrokeColor(0.0, 0.0, 0.0);
+		/*SetStrokeColor(0.0, 0.0, 0.0);
 
 		SetFillColor(255.0, 0.0, 0.0);
 		FillRect(10, 10, 100, 100);
@@ -245,10 +339,57 @@ void MainWindow::OnPaint()
 		FillEllipse(120, 10, 100, 100);
 		StrokeEllipse(120, 120, 100, 100);
 
-		DrawBitmap("logo.png", 10, 240, 160, 50);
+		float y = 240.0;
+		DrawBitmap("logo.png", 10, y, 160, 50);
+		y += 50.0;
 		SetFillColor(0.0, 0.0, 0.0);
-		SetFont("Arial", 16, true, false);
-		FillText("Copyright 2021 Snikta. All rights reserved.", 10, 310);
+		y += 20.0;
+		DWRITE_TEXT_METRICS metrics = FillText("Copyright 2021 Snikta. All rights reserved.", 10, y);
+		y += metrics.height + 10;*/
+		SetFont("Arial", 16, false, false);
+		float y = 10.0;
+		vector<FormControl> controls = {};
+		FormControl Button1 = DrawButton("Button1", 10, y);
+		y += Button1.height + 10;
+		FormControl RadioButton1 = DrawRadioButton("RadioButton1", 10, y);
+		y += RadioButton1.height + 10;
+		FormControl Checkbox1 = DrawCheckbox("Checkbox1", 10, y);
+
+		if (mySlabContainer->NextAvailableShapeId == 1) {
+			controls.push_back(Button1);
+			controls.push_back(RadioButton1);
+			controls.push_back(Checkbox1);
+
+			vector<Shape*> shapesToPreprocess;
+			for (int i = 0, len = controls.size(); i < len; i++)
+			{
+				FormControl& control = controls[i];
+				int shapeId = mySlabContainer->NextAvailableShapeId++;
+				int x1, x2, y1, y2;
+				Shape* newShape = new Shape;
+				newShape->id = shapeId;
+				newShape->x1 = control.x;
+				newShape->x2 = control.x + control.width;
+				newShape->y1 = control.y;
+				newShape->y2 = control.y + control.height;
+				shapesToPreprocess.push_back(newShape);
+			}
+			mySlabContainer->preprocessSubdivision(shapesToPreprocess, 'x', nilSlab);
+		}
+
+		if (MainWindow::success && selRegion != nullptr)
+		{
+			SetStrokeColor(255.0, 0.0, 0.0);
+			for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
+			{
+				StrokeRect(
+					selRegion->shapes[i]->x1,
+					selRegion->shapes[i]->y1,
+					selRegion->shapes[i]->x2 - selRegion->shapes[i]->x1,
+					selRegion->shapes[i]->y2 - selRegion->shapes[i]->y1
+				);
+			}
+		}
 
 		hr = pRenderTarget->EndDraw();
 		if (FAILED(hr) || hr == D2DERR_RECREATE_TARGET)
@@ -297,6 +438,77 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	return 0;
 }
 
+void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
+{
+	const D2D1_POINT_2F dips = DPIScale::PixelsToDips(pixelX, pixelY);
+	float x2 = dips.x;
+	float y2 = dips.y;
+
+	RedBlackTree* rbt = &(mySlabContainer->RBTSlabLines);
+	RedBlackNode* node = rbt->closest(x2);
+	Slab* slab = &nilSlab;
+	bool success = false, slabExists = false;
+
+	MainWindow::success = false;
+
+	if (node->key > x2)
+	{
+		int nodeKey = rbt->predecessor(node)->key;
+		slabExists = mySlabContainer->SlabLinesByLeft.find(nodeKey) != mySlabContainer->SlabLinesByLeft.end();
+		if (slabExists)
+		{
+			slab = mySlabContainer->SlabLinesByLeft[nodeKey];
+		}
+	}
+	else
+	{
+		slabExists = mySlabContainer->SlabLinesByLeft.find(node->key) != mySlabContainer->SlabLinesByLeft.end();
+		if (slabExists)
+		{
+			slab = mySlabContainer->SlabLinesByLeft[node->key];
+		}
+	}
+
+	if (slabExists && x2 >= slab->leftX && x2 <= slab->rightX)
+	{
+		rbt = slab->RBTRegions;
+		node = rbt->closest(y2);
+
+		bool regionExists;
+		Region* region = &nilRegion;
+		if (node->key > y2)
+		{
+			int regionKey = rbt->predecessor(node)->key;
+			regionExists = slab->RegionsByTop.find(regionKey) != slab->RegionsByTop.end();
+			if (regionExists)
+			{
+				region = slab->RegionsByTop[regionKey];
+			}
+		}
+		else
+		{
+			regionExists = slab->RegionsByTop.find(node->key) != slab->RegionsByTop.end();
+			if (regionExists)
+			{
+				region = slab->RegionsByTop[node->key];
+			}
+		}
+
+		if (regionExists && y2 >= region->topY && y2 <= region->bottomY)
+		{
+			selRegion = region;
+
+			MainWindow::slabLeft = slab->leftX;
+			MainWindow::slabRight = slab->rightX;
+
+			MainWindow::regionTop = region->topY;
+			MainWindow::regionBottom = region->bottomY;
+
+			MainWindow::success = true;
+		}
+	}
+}
+
 LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	switch (uMsg)
@@ -316,10 +528,13 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return 0;
 
 	case WM_PAINT:
-		OnPaint();
+		//OnPaint();
 		return 0;
 
-
+	case WM_MOUSEMOVE:
+		OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), (DWORD)wParam);
+		OnPaint();
+		return 0;
 
 	case WM_SIZE:
 		Resize();

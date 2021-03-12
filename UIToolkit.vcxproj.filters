@@ -39,6 +39,12 @@
     <ClInclude Include="SafeRelease.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RedBlackTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SlabDecomposition.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="UIToolkit.cpp">
@@ -49,6 +55,12 @@
     </ClCompile>
     <ClCompile Include="LoadBitmapFromFile.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RedBlackTree.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SlabDecomposition.cpp">
+      <Filter>Header Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
