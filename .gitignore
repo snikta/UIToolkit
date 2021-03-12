@@ -1,0 +1,9 @@
+.vs
+.vs/
+.vs/*
+Debug
+Debug/
+Debug/*
+Release
+Release/
+Release/*
