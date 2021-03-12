@@ -9,6 +9,7 @@
 #include "LoadBitmapFromFile.h"
 #include "SafeRelease.h"
 
+#include "FormControl.h"
 #include "SlabDecomposition.h"
 
 using std::string;
@@ -38,18 +39,9 @@ LPCWSTR stringToLPCWSTR(string str) {
 }
 // END: https://stackoverflow.com/questions/27220/how-to-convert-stdstring-to-lpcwstr-in-c-unicode*/
 
-class FormControl {
-public:
-	float x;
-	float y;
-	float width;
-	float height;
-
-	FormControl(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {};
-};
-
 SlabContainer *mySlabContainer = new SlabContainer;
 Region* selRegion;
+vector<FormControl*> controls = {};
 IWICImagingFactory* m_pWICFactory;
 ID2D1Bitmap* m_pBitmap;
 ID2D1HwndRenderTarget* pRenderTarget = NULL;
@@ -189,34 +181,62 @@ void DrawBitmap(string src, float x, float y, float width, float height) {
 	}
 }
 
-FormControl DrawButton(string label, float x, float y) {
-	DWRITE_TEXT_METRICS metrics = MeasureText(label);
-	SetFillColor(211.0, 211.0, 211.0);
-	FillRect(x, y, 20 + metrics.width, 20 + metrics.height);
-	SetStrokeColor(0.0, 0.0, 0.0);
-	StrokeRect(x, y, 20 + metrics.width, 20 + metrics.height);
-	SetFillColor(0.0, 0.0, 0.0);
-	FillText(label, x + 10, y + 10);
-	return FormControl(x, y, 20 + metrics.width, 20 + metrics.height);
-}
+class Button : public FormControl {
+public:
+	Button(std::string label, float x, float y) : FormControl(label, x, y) {
+		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		width = metrics.width + 20;
+		height = metrics.height + 20;
+	};
+	void Render() {
+		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		if (hover) {
+			SetFillColor(161.0, 161.0, 161.0);
+		}
+		else {
+			SetFillColor(211.0, 211.0, 211.0);
+		}
+		FillRect(x, y, 20 + metrics.width, 20 + metrics.height);
+		SetStrokeColor(0.0, 0.0, 0.0);
+		StrokeRect(x, y, 20 + metrics.width, 20 + metrics.height);
+		SetFillColor(0.0, 0.0, 0.0);
+		FillText(label, x + 10, y + 10);
+	}
+};
 
-FormControl DrawRadioButton(string label, float x, float y) {
-	DWRITE_TEXT_METRICS metrics = MeasureText(label);
-	SetFillColor(0.0, 0.0, 0.0);
-	SetStrokeColor(0.0, 0.0, 0.0);
-	DrawBitmap("radiobutton.png", x, y, metrics.height, metrics.height);
-	FillText(label, x + metrics.height + 10, y);
-	return FormControl(x, y, metrics.height + 10 + metrics.width, metrics.height);
-}
+class RadioButton : public FormControl {
+public:
+	RadioButton(std::string label, float x, float y) : FormControl(label, x, y) {
+		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		width = metrics.height + 10 + metrics.width;
+		height = metrics.height + 10;
+	};
+	void Render() {
+		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		SetFillColor(0.0, 0.0, 0.0);
+		SetStrokeColor(0.0, 0.0, 0.0);
+		string src = hover ? "radiobutton.png" : "radiobutton_unchecked.png";
+		DrawBitmap(src, x, y, metrics.height, metrics.height);
+		FillText(label, x + metrics.height + 10, y);
+	}
+};
 
-FormControl DrawCheckbox(string label, float x, float y) {
-	DWRITE_TEXT_METRICS metrics = MeasureText(label);
-	SetFillColor(0.0, 0.0, 0.0);
-	SetStrokeColor(0.0, 0.0, 0.0);
-	DrawBitmap("checkbox.png", x, y, metrics.height, metrics.height);
-	FillText(label, x + metrics.height + 10, y);
-	return FormControl(x, y, metrics.height + 10 + metrics.width, metrics.height);
-}
+class Checkbox : public FormControl {
+public:
+	Checkbox(std::string label, float x, float y) : FormControl(label, x, y) {
+		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		width = metrics.height + 10 + metrics.width;
+		height = metrics.height + 10;
+	};
+	void Render() {
+		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		SetFillColor(0.0, 0.0, 0.0);
+		SetStrokeColor(0.0, 0.0, 0.0);
+		string src = hover ? "checkbox.png" : "checkbox_unchecked.png";
+		DrawBitmap(src, x, y, metrics.height, metrics.height);
+		FillText(label, x + metrics.height + 10, y);
+	}
+};
 
 class MainWindow : public BaseWindow<MainWindow>
 {
@@ -329,6 +349,26 @@ void MainWindow::OnPaint()
 
 		hr = DemoApp::CreateDeviceIndependentResources();
 
+		if (MainWindow::success && selRegion != nullptr)
+		{
+			SetStrokeColor(255.0, 0.0, 0.0);
+
+			for (int i = 0, len = controls.size(); i < len; i++) {
+				controls[i]->hover = false;
+			}
+
+			for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
+			{
+				selRegion->shapes[i]->control->hover = true;
+				StrokeRect(
+					selRegion->shapes[i]->x1,
+					selRegion->shapes[i]->y1,
+					selRegion->shapes[i]->x2 - selRegion->shapes[i]->x1,
+					selRegion->shapes[i]->y2 - selRegion->shapes[i]->y1
+				);
+			}
+		}
+
 		/*SetStrokeColor(0.0, 0.0, 0.0);
 
 		SetFillColor(255.0, 0.0, 0.0);
@@ -346,16 +386,17 @@ void MainWindow::OnPaint()
 		y += 20.0;
 		DWRITE_TEXT_METRICS metrics = FillText("Copyright 2021 Snikta. All rights reserved.", 10, y);
 		y += metrics.height + 10;*/
+
 		SetFont("Arial", 16, false, false);
-		float y = 10.0;
-		vector<FormControl> controls = {};
-		FormControl Button1 = DrawButton("Button1", 10, y);
-		y += Button1.height + 10;
-		FormControl RadioButton1 = DrawRadioButton("RadioButton1", 10, y);
-		y += RadioButton1.height + 10;
-		FormControl Checkbox1 = DrawCheckbox("Checkbox1", 10, y);
 
 		if (mySlabContainer->NextAvailableShapeId == 1) {
+			float y = 10.0;
+			Button* Button1 = new Button("Button1", 10.0F, y);
+			y += Button1->height + 10.0;
+			RadioButton* RadioButton1 = new RadioButton("RadioButton1", 10.0F, y);
+			y += RadioButton1->height + 10.0;
+			Checkbox* Checkbox1 = new Checkbox("Checkbox1", 10.0F, y);
+
 			controls.push_back(Button1);
 			controls.push_back(RadioButton1);
 			controls.push_back(Checkbox1);
@@ -363,32 +404,23 @@ void MainWindow::OnPaint()
 			vector<Shape*> shapesToPreprocess;
 			for (int i = 0, len = controls.size(); i < len; i++)
 			{
-				FormControl& control = controls[i];
+				FormControl *control = controls[i];
 				int shapeId = mySlabContainer->NextAvailableShapeId++;
 				int x1, x2, y1, y2;
 				Shape* newShape = new Shape;
 				newShape->id = shapeId;
-				newShape->x1 = control.x;
-				newShape->x2 = control.x + control.width;
-				newShape->y1 = control.y;
-				newShape->y2 = control.y + control.height;
+				newShape->x1 = control->x;
+				newShape->x2 = control->x + control->width;
+				newShape->y1 = control->y;
+				newShape->y2 = control->y + control->height;
+				newShape->control = control;
 				shapesToPreprocess.push_back(newShape);
 			}
 			mySlabContainer->preprocessSubdivision(shapesToPreprocess, 'x', nilSlab);
 		}
 
-		if (MainWindow::success && selRegion != nullptr)
-		{
-			SetStrokeColor(255.0, 0.0, 0.0);
-			for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
-			{
-				StrokeRect(
-					selRegion->shapes[i]->x1,
-					selRegion->shapes[i]->y1,
-					selRegion->shapes[i]->x2 - selRegion->shapes[i]->x1,
-					selRegion->shapes[i]->y2 - selRegion->shapes[i]->y1
-				);
-			}
+		for (int i = 0, len = controls.size(); i < len; i++) {
+			controls[i]->Render();
 		}
 
 		hr = pRenderTarget->EndDraw();

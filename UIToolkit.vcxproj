@@ -152,6 +152,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="basewin.h" />
+    <ClInclude Include="FormControl.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="LoadBitmapFromFile.h" />
     <ClInclude Include="RedBlackTree.h" />

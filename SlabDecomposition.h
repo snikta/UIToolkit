@@ -5,6 +5,7 @@
 #include <map>
 #include <algorithm>
 #include "RedBlackTree.h"
+#include "FormControl.h"
 #include <vector>
 #include <d2d1.h>
 using std::vector;
@@ -52,6 +53,7 @@ public:
 	vector<Slab*> slabs; // must delete Slabs later
 	int id, x1, x2, y1, y2;
 	D2D1_RECT_F *rect;
+	FormControl* control;
 	void (*clickHandler)();
 };
 

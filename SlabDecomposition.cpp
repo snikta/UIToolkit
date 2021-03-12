@@ -23,7 +23,6 @@ Region nilRegion;
 Slab::~Slab() {
 	for (auto it = RegionsByTop.begin(); it != RegionsByTop.end(); ++it) {
 		delete it->second;
-		//OutputDebugStringW(L"deleted");
 	}
 }
 
