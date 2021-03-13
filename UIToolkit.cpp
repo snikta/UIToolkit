@@ -241,6 +241,7 @@ public:
 class Textbox : public FormControl {
 public:
 	std::string value = "";
+	int charIndex = 0;
 	Textbox(std::string label, float x, float y) : FormControl(label, x, y) {
 		type = FormTextbox;
 		width = 150.0;
@@ -257,7 +258,10 @@ public:
 		FillRect(x, y, width, height);
 		StrokeRect(x, y, width, height);
 		SetFillColor(0.0, 0.0, 0.0);
-		FillText(value, x + 10, y + 10);
+		FillText(value, x + 10, y + 5);
+		DWRITE_TEXT_METRICS metrics = MeasureText(value.substr(0, charIndex));
+		SetStrokeColor(30.0, 30.0, 30.0);
+		StrokeRect(x + 10 + metrics.widthIncludingTrailingWhitespace, y + 5, 1, metrics.height);
 	}
 };
 
@@ -321,12 +325,14 @@ public:
 	}
 };
 
+Textbox* TextboxInFocus = nullptr;
+ComboBox* ComboBoxInFocus = nullptr;
+
 class MainWindow : public BaseWindow<MainWindow>
 {
 	ID2D1Factory* pFactory;
 	bool success;
 	float slabLeft, slabRight, regionTop, regionBottom;
-	Textbox* TextboxInFocus = nullptr;
 	void    CalculateLayout();
 	HRESULT CreateGraphicsResources();
 	void    DiscardGraphicsResources();
@@ -421,6 +427,17 @@ void MainWindow::DiscardGraphicsResources()
 	SafeRelease(&pRenderTarget);
 }
 
+void addComboBoxItem() {
+	ComboBoxInFocus->options.push_back(TextboxInFocus->value);
+}
+
+void removeComboBoxItem() {
+	if (ComboBoxInFocus->selectedIndex != -1) {
+		ComboBoxInFocus->options.erase(ComboBoxInFocus->options.begin() + ComboBoxInFocus->selectedIndex);
+		ComboBoxInFocus->selectedIndex = clamp(ComboBoxInFocus->selectedIndex - 1, 0, ComboBoxInFocus->options.size() - 1);
+	}
+}
+
 void MainWindow::OnPaint()
 {
 	HRESULT hr = CreateGraphicsResources();
@@ -481,8 +498,12 @@ void MainWindow::OnPaint()
 			y += ComboBox1->height + 10.0;
 			Textbox* Textbox1 = new Textbox("Textbox1", 10.0F, y);
 			y += Textbox1->height + 10.0;
-			Button* Button1 = new Button("Button1", 10.0F, y);
+			Button* Button1 = new Button("Add", 10.0F, y);
+			Button1->clickHandler = addComboBoxItem;
 			y += Button1->height + 10.0;
+			Button* Button2 = new Button("Remove", 10.0F, y);
+			Button2->clickHandler = removeComboBoxItem;
+			y += Button2->height + 10.0;
 			RadioButton* RadioButton1 = new RadioButton("RadioButton1", 10.0F, y);
 			y += RadioButton1->height + 10.0;
 			Checkbox* Checkbox1 = new Checkbox("Checkbox1", 10.0F, y);
@@ -490,6 +511,7 @@ void MainWindow::OnPaint()
 			controls.push_back(ComboBox1);
 			controls.push_back(Textbox1);
 			controls.push_back(Button1);
+			controls.push_back(Button2);
 			controls.push_back(RadioButton1);
 			controls.push_back(Checkbox1);
 
@@ -665,8 +687,23 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 		if (selRegion->shapes[i]->control->clickHandler != nullptr) {
 			selRegion->shapes[i]->control->clickHandler();
 		}
+		if (selRegion->shapes[i]->control->type == FormComboBox) {
+			ComboBoxInFocus = (ComboBox*)selRegion->shapes[i]->control;
+		}
 		if (selRegion->shapes[i]->control->type == FormTextbox) {
 			TextboxInFocus = (Textbox*)selRegion->shapes[i]->control;
+			int charIndex = 0;
+			int x = TextboxInFocus->x + 10;
+			while (charIndex < TextboxInFocus->value.size() && x < (TextboxInFocus->x + TextboxInFocus->width)) {
+				x = TextboxInFocus->x + 10 + MeasureText(TextboxInFocus->value.substr(0, charIndex + 1)).widthIncludingTrailingWhitespace;
+				charIndex++;
+				if (x >= pixelX) {
+					charIndex--;
+					break;
+				}
+			}
+			TextboxInFocus->charIndex = clamp(charIndex, 0, TextboxInFocus->value.size());
+			OnPaint();
 		}
 	}
 }
@@ -697,26 +734,59 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		return 0;
 
-	case WM_CHAR:
-		switch (wParam)
-		{
-		/*case VK_LEFT: case VK_UP: case VK_RIGHT: */case VK_BACK:
-			if (TextboxInFocus != nullptr) {
-				TextboxInFocus->value = TextboxInFocus->value.substr(0, TextboxInFocus->value.size() - 1);
+	case WM_KEYDOWN:
+		if (TextboxInFocus != nullptr) {
+			bool shouldContinue = false;
+			switch (wParam) {
+			case VK_LEFT:
+				TextboxInFocus->charIndex = clamp(TextboxInFocus->charIndex - 1, 0, TextboxInFocus->value.size());
+				break;
+			case VK_RIGHT:
+				TextboxInFocus->charIndex = clamp(TextboxInFocus->charIndex + 1, 0, TextboxInFocus->value.size());
+				break;
+			case VK_HOME:
+				TextboxInFocus->charIndex = 0;
+				break;
+			case VK_END:
+				TextboxInFocus->charIndex = TextboxInFocus->value.size();
+				break;
+			case VK_DELETE:
+				if (TextboxInFocus->charIndex == TextboxInFocus->value.size()) {
+					return 0;
+				}
+				TextboxInFocus->value = TextboxInFocus->value.substr(0, TextboxInFocus->charIndex) + TextboxInFocus->value.substr(TextboxInFocus->charIndex + 1);
+				break;
+			case VK_BACK:
+				if (TextboxInFocus->charIndex == 0) {
+					return 0;
+				}
+				TextboxInFocus->value = TextboxInFocus->value.substr(0, TextboxInFocus->charIndex - 1) + TextboxInFocus->value.substr(TextboxInFocus->charIndex);
+				TextboxInFocus->charIndex = max(0, TextboxInFocus->charIndex - 1);
+				break;
+			default:
+				shouldContinue = true;
+				break;
 			}
-			OnPaint();
-			return 0; break;
-		default:
-			break;
+			if (!shouldContinue) {
+				OnPaint();
+				return 0;
+			}
 		}
-		
+		return 0;
+
+	case WM_CHAR:
+		if (wParam == VK_BACK) {
+			return 0;
+		}
 		if (TextboxInFocus != nullptr) {
 			if (wParam >= 32 && wParam <= 126) {
-				TextboxInFocus->value = TextboxInFocus->value + char(wParam);
+				TextboxInFocus->value = TextboxInFocus->value.substr(0, TextboxInFocus->charIndex) + char(wParam) + TextboxInFocus->value.substr(min(TextboxInFocus->value.size(), TextboxInFocus->charIndex));
+				TextboxInFocus->charIndex++;
 			}
 		}
 
 		OnPaint();
+		return 0;
 
 	case WM_PAINT:
 		//OnPaint();
