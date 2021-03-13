@@ -48,6 +48,9 @@
     <ClInclude Include="FormControl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="stringToLPCWSTR.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="UIToolkit.cpp">
@@ -64,6 +67,12 @@
     </ClCompile>
     <ClCompile Include="SlabDecomposition.cpp">
       <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FormControl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stringToLPCWSTR.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

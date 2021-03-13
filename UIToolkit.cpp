@@ -12,6 +12,7 @@
 
 #include "FormControl.h"
 #include "SlabDecomposition.h"
+#include "stringToLPCWSTR.h"
 
 using std::string;
 using std::vector;
@@ -24,25 +25,6 @@ int clamp(int value, int min, int max) {
 	return min(max(value, min), max);
 }
 
-// START: https://stackoverflow.com/questions/27220/how-to-convert-stdstring-to-lpcwstr-in-c-unicode
-std::wstring s2ws(const string& s)
-{
-	int len;
-	int slength = (int)s.length() + 1;
-	len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
-	wchar_t* buf = new wchar_t[len];
-	MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
-	std::wstring r(buf);
-	delete[] buf;
-	return r;
-}
-LPCWSTR stringToLPCWSTR(string str) {
-	std::wstring stemp = s2ws(str);
-	LPCWSTR result = stemp.c_str();
-	return result;
-}
-// END: https://stackoverflow.com/questions/27220/how-to-convert-stdstring-to-lpcwstr-in-c-unicode*/
-
 float pageX = 0.0;
 float pageY = 0.0;
 SlabContainer *mySlabContainer = new SlabContainer;
@@ -53,7 +35,7 @@ ID2D1Bitmap* m_pBitmap;
 ID2D1HwndRenderTarget* pRenderTarget = NULL;
 ID2D1SolidColorBrush* pFillBrush = nullptr;
 ID2D1SolidColorBrush* pStrokeBrush = nullptr;
-IDWriteFactory* m_pDWriteFactory;
+IDWriteFactory* m_pDWriteFactory = nullptr;
 IDWriteTextFormat* m_pTextFormat = nullptr;
 float lineWidth = 1.0;
 void FillRect(float x, float y, float width, float height) {
@@ -137,7 +119,7 @@ DWRITE_TEXT_METRICS MeasureText(string text) {
 	return metrics;
 }
 
-DWRITE_TEXT_METRICS FillText(string text, float x, float y) {
+DWRITE_TEXT_METRICS FillText(string text, float x, float y, IDWriteTextFormat* m_pTextFormat) {
 	IDWriteTextLayout* pTextLayout_ = NULL;
 	string s1 = text;
 	std::wstring widestr = std::wstring(s1.begin(), s1.end());
@@ -191,6 +173,19 @@ void DrawBitmap(string src, float x, float y, float width, float height) {
 	}
 }
 
+class BitmapImage : public FormControl {
+public:
+	string src;
+	BitmapImage(string src, float x, float y, float width, float height) : FormControl("", x, y) {
+		this->src = src;
+		this->width = width;
+		this->height = height;
+	}
+	void Render() {
+		DrawBitmap(src, x, y, width, height);
+	}
+};
+
 class ComboBox : public FormControl {
 public:
 	vector<string> options;
@@ -216,7 +211,7 @@ public:
 		FillRect(x, y, width, height);
 		StrokeRect(x, y, width, height);
 		SetFillColor(0.0, 0.0, 0.0);
-		DWRITE_TEXT_METRICS metrics = FillText(selectedIndex == -1 ? "" : options[selectedIndex], x + 10, y + 5);
+		DWRITE_TEXT_METRICS metrics = FillText(selectedIndex == -1 ? "" : options[selectedIndex], x + 10, y + 5, m_pTextFormat);
 		DrawBitmap("menu_open.png", x + width - 24 - 5, y + 5, 24, 24);
 		if (toggled) {
 			SetFillColor(255.0, 255.0, 255.0);
@@ -230,7 +225,7 @@ public:
 					FillRect(x, optionY - 10.0, width, metrics.height + 20);
 					SetFillColor(0.0, 0.0, 0.0);
 				}
-				FillText(options[i], x + 10, optionY);
+				FillText(options[i], x + 10, optionY, m_pTextFormat);
 				optionY += metrics.height + 20;
 			}
 			itemHeight = metrics.height + 20;
@@ -258,7 +253,7 @@ public:
 		FillRect(x, y, width, height);
 		StrokeRect(x, y, width, height);
 		SetFillColor(0.0, 0.0, 0.0);
-		FillText(value, x + 10, y + 5);
+		FillText(value, x + 10, y + 5, m_pTextFormat);
 		DWRITE_TEXT_METRICS metrics = MeasureText(value.substr(0, charIndex));
 		SetStrokeColor(30.0, 30.0, 30.0);
 		StrokeRect(x + 10 + metrics.widthIncludingTrailingWhitespace, y + 5, 1, metrics.height);
@@ -284,8 +279,9 @@ public:
 		FillRect(x, y, 20 + metrics.width, 20 + metrics.height);
 		SetStrokeColor(0.0, 0.0, 0.0);
 		StrokeRect(x, y, 20 + metrics.width, 20 + metrics.height);
-		SetFillColor(0.0, 0.0, 0.0);
-		FillText(label, x + 10, y + 10);
+		Color foreColor = getForeColor();
+		SetFillColor(foreColor.red, foreColor.green, foreColor.blue);
+		FillText(label, x + 10, y + 10, m_pTextFormat);
 	}
 };
 
@@ -303,7 +299,7 @@ public:
 		SetStrokeColor(0.0, 0.0, 0.0);
 		string src = toggled ? "radiobutton.png" : "radiobutton_unchecked.png";
 		DrawBitmap(src, x, y, metrics.height, metrics.height);
-		FillText(label, x + metrics.height + 10, y);
+		FillText(label, x + metrics.height + 10, y, m_pTextFormat);
 	}
 };
 
@@ -321,7 +317,7 @@ public:
 		SetStrokeColor(0.0, 0.0, 0.0);
 		string src = toggled ? "checkbox.png" : "checkbox_unchecked.png";
 		DrawBitmap(src, x, y, metrics.height, metrics.height);
-		FillText(label, x + metrics.height + 10, y);
+		FillText(label, x + metrics.height + 10, y, m_pTextFormat);
 	}
 };
 
@@ -395,6 +391,7 @@ HRESULT MainWindow::CreateGraphicsResources()
 	if (pRenderTarget == NULL)
 	{
 		RECT rc;
+
 		GetClientRect(m_hwnd, &rc);
 
 		D2D1_SIZE_U size = D2D1::SizeU(rc.right, rc.bottom);
@@ -425,6 +422,20 @@ HRESULT MainWindow::CreateGraphicsResources()
 void MainWindow::DiscardGraphicsResources()
 {
 	SafeRelease(&pRenderTarget);
+}
+
+BitmapImage* BitmapImage1;
+
+void SelectLogo() {
+	BitmapImage1->src = "logo.png";
+	BitmapImage1->width = 160.0;
+	BitmapImage1->height = 50.0;
+}
+
+void SelectApollo() {
+	BitmapImage1->src = "apollo.jpg";
+	BitmapImage1->width = 232.0;
+	BitmapImage1->height = 152.0;
 }
 
 void addComboBoxItem() {
@@ -496,10 +507,16 @@ void MainWindow::OnPaint()
 			float y = 10.0;
 			ComboBox* ComboBox1 = new ComboBox({ "Arial", "Tahoma", "Comic Sans MS", "Times New Roman", "Calibri", "Verdana" }, 10.0F, y);
 			y += ComboBox1->height + 10.0;
+			ComboBox1->setFontName("Comic Sans MS");
+			ComboBox1->setBold(true);
 			Textbox* Textbox1 = new Textbox("Textbox1", 10.0F, y);
+			Textbox1->setFontName("Times New Roman");
 			y += Textbox1->height + 10.0;
 			Button* Button1 = new Button("Add", 10.0F, y);
 			Button1->clickHandler = addComboBoxItem;
+			Button1->setForeColor(Color(255.0F, 0.0F, 0.0F, 1.0F));
+			Button1->setBold(true);
+			Button1->setItalic(true);
 			y += Button1->height + 10.0;
 			Button* Button2 = new Button("Remove", 10.0F, y);
 			Button2->clickHandler = removeComboBoxItem;
@@ -507,6 +524,14 @@ void MainWindow::OnPaint()
 			RadioButton* RadioButton1 = new RadioButton("RadioButton1", 10.0F, y);
 			y += RadioButton1->height + 10.0;
 			Checkbox* Checkbox1 = new Checkbox("Checkbox1", 10.0F, y);
+			y += Checkbox1->height + 10.0;
+			RadioButton* RadioButton2 = new RadioButton("logo.png", 10.0F, y);
+			RadioButton2->clickHandler = SelectLogo;
+			y += RadioButton2->height + 10.0;
+			RadioButton* RadioButton3 = new RadioButton("apollo.jpg", 10.0F, y);
+			RadioButton3->clickHandler = SelectApollo;
+			y += RadioButton3->height + 10.0;
+			BitmapImage1 = new BitmapImage("logo.png", 10.0F, y, 160.0, 50.0);
 
 			controls.push_back(ComboBox1);
 			controls.push_back(Textbox1);
@@ -514,6 +539,9 @@ void MainWindow::OnPaint()
 			controls.push_back(Button2);
 			controls.push_back(RadioButton1);
 			controls.push_back(Checkbox1);
+			controls.push_back(RadioButton2);
+			controls.push_back(RadioButton3);
+			controls.push_back(BitmapImage1);
 
 			vector<Shape*> shapesToPreprocess;
 			for (int i = 0, len = controls.size(); i < len; i++)
@@ -678,6 +706,9 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 				return;
 			}
 		}
+		if (control->type == FormRadioButton) {
+
+		}
 		controls[i]->focused = false;
 	}
 
@@ -709,11 +740,13 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 }
 
 void MainWindow::OnLButtonUp() {
-	for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
-	{
-		selRegion->shapes[i]->control->toggled = !selRegion->shapes[i]->control->toggled;
+	if (selRegion != nullptr) {
+		for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
+		{
+			selRegion->shapes[i]->control->toggled = !selRegion->shapes[i]->control->toggled;
+		}
+		OnPaint();
 	}
-	OnPaint();
 }
 
 LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)

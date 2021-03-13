@@ -159,14 +159,17 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SafeRelease.h" />
     <ClInclude Include="SlabDecomposition.h" />
+    <ClInclude Include="stringToLPCWSTR.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="UIToolkit.h" />
     <ClInclude Include="WICViewerD2D.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="FormControl.cpp" />
     <ClCompile Include="LoadBitmapFromFile.cpp" />
     <ClCompile Include="RedBlackTree.cpp" />
     <ClCompile Include="SlabDecomposition.cpp" />
+    <ClCompile Include="stringToLPCWSTR.cpp" />
     <ClCompile Include="UIToolkit.cpp" />
     <ClCompile Include="WICViewerD2D.cpp" />
   </ItemGroup>
