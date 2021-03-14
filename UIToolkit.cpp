@@ -224,6 +224,76 @@ public:
 	}
 };
 
+class MenuBar;
+
+class MenuBarItem {
+public:
+	string label;
+	MenuBar *menuBar = nullptr;
+	MenuBarItem(string label) : label(label) {};
+	MenuBarItem(string label, MenuBar* menuBar) : label(label), menuBar(menuBar) {};
+};
+
+class MenuBar : public FormControl {
+private:
+	vector<MenuBarItem> items;
+	float itemHeight;
+public:
+	MenuBar* parent = nullptr;
+	bool visible = false;
+	MenuBar(float x, float y) : FormControl("", x, y) {
+		width = 0;
+		height = 0;
+		setBackColor(Color(255.0, 0.0, 0.0, 1.0));
+		setForeColor(Color(255.0, 255.0, 255.0, 1.0));
+		setItemHeight(30.0);
+	};
+	int getItemCount() {
+		return items.size();
+	}
+	MenuBarItem& getItem(int itemIndex) {
+		return items[itemIndex];
+	}
+	float getItemHeight() {
+		return itemHeight;
+	}
+	void setItemHeight(float newItemHeight) {
+		itemHeight = newItemHeight;
+	}
+	void AddItem(string label, MenuBar *menuBar) {
+		items.push_back(MenuBarItem(label, menuBar));
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
+		menuBar->parent = this;
+		menuBar->x = x + metrics.widthIncludingTrailingWhitespace;
+		menuBar->y = y + height;
+		menuBar->width = max(menuBar->width, metrics.widthIncludingTrailingWhitespace);
+		width = max(width, metrics.widthIncludingTrailingWhitespace);
+		height = items.size() * getItemHeight();
+	}
+	void AddItem(string label) {
+		items.push_back(MenuBarItem(label));
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
+		width = max(width, metrics.widthIncludingTrailingWhitespace);
+		height = items.size() * getItemHeight();
+	}
+	void Render() {
+		SetFillColor(getBackColor());
+		FillRect(x, y, width, height);
+		int menuY = y;
+		for (int i = 0, len = items.size(); i < len; i++) {
+			SetFillColor(getForeColor());
+			FillText(items[i].label, x, menuY, m_pTextFormat);
+			menuY += getItemHeight();
+			if (items[i].menuBar != nullptr) {
+				if (items[i].menuBar->visible) {
+					items[i].menuBar->x = x + width;
+					items[i].menuBar->Render();
+				}
+			}
+		}
+	}
+};
+
 class ToolbarIcon {
 public:
 	string label;
@@ -702,6 +772,96 @@ void MainWindow::OnPaint()
 
 		if (mySlabContainer->NextAvailableShapeId == 1) {
 			float y = 10.0;
+			MenuBar* MenuBar1 = new MenuBar(10.0F, y);
+			MenuBar1->visible = true;
+			MenuBar* FileMenu = new MenuBar(10.0F, y);
+			MenuBar* EditMenu = new MenuBar(10.0F, y);
+			MenuBar* ViewMenu = new MenuBar(10.0F, y);
+			MenuBar* FormatMenu = new MenuBar(10.0F, y);
+			MenuBar* LineJoinMenu = new MenuBar(10.0F, y);
+			MenuBar* LineCapMenu = new MenuBar(10.0F, y);
+			MenuBar* OrderMenu = new MenuBar(10.0F, y);
+			MenuBar* AlignMenu = new MenuBar(10.0F, y);
+			MenuBar* AlignVerticalMenu = new MenuBar(10.0F, y);
+			MenuBar* AlignHorizontalMenu = new MenuBar(10.0F, y);
+			MenuBar* CenterOnPageMenu = new MenuBar(10.0F, y);
+			MenuBar* MakeSameSizeMenu = new MenuBar(10.0F, y);
+			MenuBar* EqualizeGapsMenu = new MenuBar(10.0F, y);
+			MenuBar* FlipMenu = new MenuBar(10.0F, y);
+			MenuBar* ToolsMenu = new MenuBar(10.0F, y);
+			MenuBar* TableMenu = new MenuBar(10.0F, y);
+			MenuBar* HelpMenu = new MenuBar(10.0F, y);
+			HelpMenu->AddItem("About");
+			TableMenu->AddItem("Insert Row Above");
+			TableMenu->AddItem("Insert Row Below");
+			TableMenu->AddItem("Insert Column Left");
+			TableMenu->AddItem("Insert Column Right");
+			TableMenu->AddItem("Select Cells");
+			TableMenu->AddItem("Merge Cells");
+			ToolsMenu->AddItem("Macros");
+			ToolsMenu->AddItem("Form Designer");
+			FlipMenu->AddItem("Horizontally");
+			FlipMenu->AddItem("Vertically");
+			FlipMenu->AddItem("Both");
+			EqualizeGapsMenu->AddItem("Horizontally");
+			EqualizeGapsMenu->AddItem("Vertically");
+			EqualizeGapsMenu->AddItem("Both");
+			MakeSameSizeMenu->AddItem("Width");
+			MakeSameSizeMenu->AddItem("Height");
+			CenterOnPageMenu->AddItem("Horizontally");
+			CenterOnPageMenu->AddItem("Vertically");
+			CenterOnPageMenu->AddItem("Both");
+			AlignHorizontalMenu->AddItem("Left");
+			AlignHorizontalMenu->AddItem("Center");
+			AlignHorizontalMenu->AddItem("Right");
+			AlignVerticalMenu->AddItem("Top");
+			AlignVerticalMenu->AddItem("Middle");
+			AlignVerticalMenu->AddItem("Bottom");
+			AlignMenu->AddItem("Vertically", AlignVerticalMenu);
+			AlignMenu->AddItem("Horizontally", AlignHorizontalMenu);
+			OrderMenu->AddItem("Bring To Front");
+			OrderMenu->AddItem("Send To Back");
+			OrderMenu->AddItem("Bring Forward");
+			OrderMenu->AddItem("Send Backward");
+			LineJoinMenu->AddItem("Round");
+			LineJoinMenu->AddItem("Bevel");
+			LineJoinMenu->AddItem("Miter");
+			LineCapMenu->AddItem("Butt");
+			LineCapMenu->AddItem("Round");
+			LineCapMenu->AddItem("Square");
+			FormatMenu->AddItem("Line Join", LineJoinMenu);
+			FormatMenu->AddItem("Line Cap", LineCapMenu);
+			FormatMenu->AddItem("Order", OrderMenu);
+			FormatMenu->AddItem("Align", AlignMenu);
+			FormatMenu->AddItem("Center On Page", CenterOnPageMenu);
+			FormatMenu->AddItem("Make Same Size", MakeSameSizeMenu);
+			FormatMenu->AddItem("Equalize Gaps", EqualizeGapsMenu);
+			FormatMenu->AddItem("Flip", FlipMenu);
+			ViewMenu->AddItem("Increase Zoom");
+			ViewMenu->AddItem("Decrease Zoom");
+			ViewMenu->AddItem("Reset Zoom");
+			EditMenu->AddItem("Cut");
+			EditMenu->AddItem("Copy");
+			EditMenu->AddItem("Paste");
+			EditMenu->AddItem("Duplicate");
+			EditMenu->AddItem("Delete");
+			EditMenu->AddItem("Select All");
+			EditMenu->AddItem("Find");
+			EditMenu->AddItem("Replace");
+			FileMenu->AddItem("New");
+			FileMenu->AddItem("Open");
+			FileMenu->AddItem("Save");
+			FileMenu->AddItem("Save As");
+			FileMenu->AddItem("Export...");
+			MenuBar1->AddItem("File", FileMenu);
+			MenuBar1->AddItem("Edit", EditMenu);
+			MenuBar1->AddItem("View", ViewMenu);
+			MenuBar1->AddItem("Format", FormatMenu);
+			MenuBar1->AddItem("Tools", ToolsMenu);
+			MenuBar1->AddItem("Table", TableMenu);
+			MenuBar1->AddItem("Help", HelpMenu);
+
+			y += MenuBar1->height;
 			Toolbar* Toolbar1 = new Toolbar(10.0F, y);
 			Toolbar1->AddIcon("Back", "icons/back.png", ClickBack);
 			Toolbar1->AddIcon("Forward", "icons/forward.png", ClickForward);
@@ -762,6 +922,7 @@ void MainWindow::OnPaint()
 			y += RadioButton6->height + 10.0;
 			BitmapImage1 = new BitmapImage("logo.png", 10.0F, y, 160.0, 50.0);
 
+			controls.push_back(MenuBar1);
 			controls.push_back(Toolbar1);
 			controls.push_back(Label1);
 			controls.push_back(ComboBox1);
@@ -952,7 +1113,38 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 		{
 			FormControl* control = selRegion->shapes[i]->control;
 			control->focused = true;
-			if (control->type == FormLabel) {
+			if (control->type == FormMenuBar) {
+				MenuBar* menuBar = (MenuBar*)control;
+				int menuBarItemIndex = int(floor(pageY - menuBar->y) / menuBar->getItemHeight());
+				if (menuBarItemIndex >= 0 && menuBarItemIndex <= menuBar->getItemCount() - 1) {
+					MenuBarItem& menuBarItem = menuBar->getItem(menuBarItemIndex);
+					if (menuBarItem.menuBar != nullptr) {
+						menuBarItem.menuBar->visible = true;
+						for (int j = 0, jLen = menuBar->getItemCount(); j < jLen; j++) {
+							if (j != menuBarItemIndex) {
+								MenuBar* itemParent = menuBar->getItem(j).menuBar;
+								if (itemParent != nullptr) {
+									itemParent->visible = false;
+								}
+							}
+						}
+					}
+				}
+				/*if (menuBar->parent == nullptr) {
+					menuBar->visible = true;
+				}
+				else {
+					MenuBar *parentMenuBar = menuBar->parent;
+					if (parentMenuBar->visible) {
+						menuBar->visible = true;
+					}
+					else {
+						menuBar->visible = false;
+						menuBar->focused = false;
+					}
+				}*/
+			}
+			else if (control->type == FormLabel) {
 				Label* label = (Label*)control;
 				if (label->target != nullptr) {
 					label->target->focused = true;
@@ -970,7 +1162,6 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 				Toolbar* toolbar = (Toolbar*)control;
 				if (toolbar != nullptr && toolbar->getHoveredIcon() != -1) {
 					ToolbarIcon& icon = toolbar->getIcon(toolbar->getHoveredIcon());
-					OutputDebugStringW(stringToLPCWSTR("getHoveredIcon(): " + std::to_string(toolbar->getHoveredIcon())));
 					if (icon.clickHandler && icon.clickHandler != nullptr) {
 						icon.clickHandler(icon);
 					}
