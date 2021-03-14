@@ -244,8 +244,8 @@ public:
 	MenuBar(float x, float y) : FormControl("", x, y) {
 		width = 0;
 		height = 0;
-		setBackColor(Color(255.0, 0.0, 0.0, 1.0));
-		setForeColor(Color(255.0, 255.0, 255.0, 1.0));
+		setBackColor(Color(211.0, 211.0, 211.0, 1.0));
+		setForeColor(Color(0.0, 0.0, 0.0, 1.0));
 		setItemHeight(30.0);
 	};
 	int getItemCount() {
@@ -767,6 +767,7 @@ void MainWindow::OnPaint()
 		y += 20.0;
 		DWRITE_TEXT_METRICS metrics = FillText("Copyright 2021 Snikta. All rights reserved.", 10 + 500, y, m_pTestTextFormat);
 		y += metrics.height + 10;
+		float copyrightNoticeY = y;
 
 		SafeRelease(m_pTestTextFormat);
 
@@ -848,7 +849,19 @@ void MainWindow::OnPaint()
 			EditMenu->AddItem("Select All");
 			EditMenu->AddItem("Find");
 			EditMenu->AddItem("Replace");
-			FileMenu->AddItem("New");
+			MenuBar* MicrosoftMenu = new MenuBar(10.0F, y);
+			MenuBar* DocumentMenu = new MenuBar(10.0F, y);
+			MenuBar* NewMenu = new MenuBar(10.0F, y);
+			MenuBar* GoogleMenu = new MenuBar(10.0F, y);
+			GoogleMenu->AddItem("Docs");
+			GoogleMenu->AddItem("Sheets");
+			GoogleMenu->AddItem("Slides");
+			MicrosoftMenu->AddItem("Word");
+			MicrosoftMenu->AddItem("Works");
+			DocumentMenu->AddItem("Microsoft", MicrosoftMenu);
+			DocumentMenu->AddItem("Google", GoogleMenu);
+			NewMenu->AddItem("Document", DocumentMenu);
+			FileMenu->AddItem("New", NewMenu);
 			FileMenu->AddItem("Open");
 			FileMenu->AddItem("Save");
 			FileMenu->AddItem("Save As");
@@ -861,7 +874,7 @@ void MainWindow::OnPaint()
 			MenuBar1->AddItem("Table", TableMenu);
 			MenuBar1->AddItem("Help", HelpMenu);
 
-			y += MenuBar1->height;
+			y += MenuBar1->height + 10.0;
 			Toolbar* Toolbar1 = new Toolbar(10.0F, y);
 			Toolbar1->AddIcon("Back", "icons/back.png", ClickBack);
 			Toolbar1->AddIcon("Forward", "icons/forward.png", ClickForward);
@@ -900,27 +913,28 @@ void MainWindow::OnPaint()
 			y += RadioButton1->height + 10.0;
 			Checkbox* Checkbox1 = new Checkbox("Checkbox1", 10.0F, y);
 			y += Checkbox1->height + 10.0;
-			RadioButton* RadioButton2 = new RadioButton("logo.png", 10.0F, y);
+			y = copyrightNoticeY;
+			RadioButton* RadioButton2 = new RadioButton("logo.png", 10.0F + 500.0F, y);
 			RadioButton2->clickHandler = SelectImage;
 			RadioButton2->groupName = "ImageSelect";
 			y += RadioButton2->height + 10.0;
-			RadioButton* RadioButton3 = new RadioButton("apollo.jpg", 10.0F, y);
+			RadioButton* RadioButton3 = new RadioButton("apollo.jpg", 10.0F + 500.0F, y);
 			RadioButton3->clickHandler = SelectImage;
 			RadioButton3->groupName = "ImageSelect";
 			y += RadioButton3->height + 10.0;
-			RadioButton* RadioButton4 = new RadioButton("browser_small.png", 10.0F, y);
+			RadioButton* RadioButton4 = new RadioButton("browser_small.png", 10.0F + 500.0F, y);
 			RadioButton4->clickHandler = SelectImage;
 			RadioButton4->groupName = "ImageSelect";
 			y += RadioButton4->height + 10.0;
-			RadioButton* RadioButton5 = new RadioButton("jpeg_small.png", 10.0F, y);
+			RadioButton* RadioButton5 = new RadioButton("jpeg_small.png", 10.0F + 500.0F, y);
 			RadioButton5->clickHandler = SelectImage;
 			RadioButton5->groupName = "ImageSelect";
 			y += RadioButton5->height + 10.0;
-			RadioButton* RadioButton6 = new RadioButton("stratolabs_.png", 10.0F, y);
+			RadioButton* RadioButton6 = new RadioButton("stratolabs_.png", 10.0F + 500.0F, y);
 			RadioButton6->clickHandler = SelectImage;
 			RadioButton6->groupName = "ImageSelect";
 			y += RadioButton6->height + 10.0;
-			BitmapImage1 = new BitmapImage("logo.png", 10.0F, y, 160.0, 50.0);
+			BitmapImage1 = new BitmapImage("logo.png", 10.0F + 500.0F, y, 160.0, 50.0);
 
 			controls.push_back(MenuBar1);
 			controls.push_back(Toolbar1);
@@ -964,7 +978,7 @@ void MainWindow::OnPaint()
 		}
 
 		for (int i = 0, len = controls.size(); i < len; i++) {
-			if (controls[i]->focused) {
+			if (controls[i]->focused || (controls[i]->type == FormMenuBar && ((MenuBar*)controls[i])->visible)) {
 				controls[i]->Render();
 			}
 		}
@@ -1016,6 +1030,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	return 0;
 }
 
+vector<MenuBar*> visibleMenus;
+
 void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 {
 	const D2D1_POINT_2F dips = DPIScale::PixelsToDips(pixelX, pixelY);
@@ -1031,6 +1047,89 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 	bool success = false, slabExists = false;
 
 	MainWindow::success = false;
+
+	for (int i = 0, len = visibleMenus.size(); i < len; i++) {
+		visibleMenus[i]->visible = false;
+		for (int j = 0, jLen = visibleMenus[i]->getItemCount(); j < jLen; j++) {
+			if (visibleMenus[i]->getItem(j).menuBar != nullptr) {
+				visibleMenus[i]->getItem(j).menuBar->visible = false;
+			}
+		}
+	}
+	for (int i = 0, len = visibleMenus.size(); i < len; i++) {
+		MenuBar* visibleMenu = visibleMenus[i];
+		if (
+			pageX >= visibleMenu->x &&
+			pageX <= (visibleMenu->x + visibleMenu->width) &&
+			pageY >= visibleMenu->y &&
+			pageY <= (visibleMenu->y + visibleMenu->height)
+			) {
+			for (int j = 0, jLen = visibleMenu->getItemCount(); j < jLen; j++) {
+				if (pageY >= (visibleMenu->y + j * visibleMenu->getItemHeight()) && pageY <= (visibleMenu->y + (j + 1) * visibleMenu->getItemHeight())) {
+					MenuBarItem menuBarItem = visibleMenu->getItem(j);
+					if (menuBarItem.menuBar != nullptr) {
+						visibleMenus.clear();
+						menuBarItem.menuBar->x = visibleMenu->x + visibleMenu->width;
+						menuBarItem.menuBar->y = visibleMenu->y + j * visibleMenu->getItemHeight();
+						MenuBar* parentMenuBar = menuBarItem.menuBar;
+						while (parentMenuBar != nullptr) {
+							visibleMenus.push_back(parentMenuBar);
+							parentMenuBar->visible = true;
+							parentMenuBar = parentMenuBar->parent;
+						}
+						return;
+					}
+					else {
+						visibleMenus.clear();
+						visibleMenus.push_back(visibleMenu);
+						visibleMenu->visible = true;
+						MenuBar* parentMenuBar = visibleMenu->parent;
+						while (parentMenuBar != nullptr) {
+							visibleMenus.push_back(parentMenuBar);
+							parentMenuBar->visible = true;
+							parentMenuBar = parentMenuBar->parent;
+						}
+						return;
+					}
+				}
+			}
+		}
+	}
+
+	visibleMenus.clear();
+	if (selRegion != nullptr) {
+		for (int i = 0, len = selRegion->shapes.size(); i < len; i++) {
+			FormControl* control = selRegion->shapes[i]->control;
+			if (!(pageX >= control->x && pageX <= (control->x + control->width) && pageY >= control->y && pageY <= (control->y + control->height))) {
+				continue;
+			}
+			if (control->type == FormMenuBar) {
+				MenuBar* menuBar = (MenuBar*)control;
+				int menuBarItemIndex = int(floor(pageY - menuBar->y) / menuBar->getItemHeight());
+				if (menuBarItemIndex >= 0 && menuBarItemIndex <= menuBar->getItemCount() - 1) {
+					MenuBarItem& menuBarItem = menuBar->getItem(menuBarItemIndex);
+					if (menuBarItem.menuBar != nullptr) {
+						menuBarItem.menuBar->visible = true;
+						if (std::find(visibleMenus.begin(), visibleMenus.end(), menuBarItem.menuBar) == visibleMenus.end()) {
+							visibleMenus.push_back(menuBarItem.menuBar);
+						}
+						for (int j = 0, jLen = menuBar->getItemCount(); j < jLen; j++) {
+							if (j != menuBarItemIndex) {
+								MenuBar* itemChildMenu = menuBar->getItem(j).menuBar;
+								if (itemChildMenu != nullptr) {
+									itemChildMenu->visible = false;
+									/*auto it = std::find(visibleMenus.begin(), visibleMenus.end(), itemChildMenu);
+									if (it != visibleMenus.end()) {
+										visibleMenus.erase(it);
+									}*/
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
 	if (node->key > x2)
 	{
@@ -1112,39 +1211,11 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 		for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
 		{
 			FormControl* control = selRegion->shapes[i]->control;
-			control->focused = true;
-			if (control->type == FormMenuBar) {
-				MenuBar* menuBar = (MenuBar*)control;
-				int menuBarItemIndex = int(floor(pageY - menuBar->y) / menuBar->getItemHeight());
-				if (menuBarItemIndex >= 0 && menuBarItemIndex <= menuBar->getItemCount() - 1) {
-					MenuBarItem& menuBarItem = menuBar->getItem(menuBarItemIndex);
-					if (menuBarItem.menuBar != nullptr) {
-						menuBarItem.menuBar->visible = true;
-						for (int j = 0, jLen = menuBar->getItemCount(); j < jLen; j++) {
-							if (j != menuBarItemIndex) {
-								MenuBar* itemParent = menuBar->getItem(j).menuBar;
-								if (itemParent != nullptr) {
-									itemParent->visible = false;
-								}
-							}
-						}
-					}
-				}
-				/*if (menuBar->parent == nullptr) {
-					menuBar->visible = true;
-				}
-				else {
-					MenuBar *parentMenuBar = menuBar->parent;
-					if (parentMenuBar->visible) {
-						menuBar->visible = true;
-					}
-					else {
-						menuBar->visible = false;
-						menuBar->focused = false;
-					}
-				}*/
+			if (!(pageX >= control->x && pageX <= (control->x + control->width) && pageY >= control->y && pageY <= (control->y + control->height))) {
+				continue;
 			}
-			else if (control->type == FormLabel) {
+			control->focused = true;
+			if (control->type == FormLabel) {
 				Label* label = (Label*)control;
 				if (label->target != nullptr) {
 					label->target->focused = true;
