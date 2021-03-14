@@ -223,6 +223,74 @@ public:
 	}
 };
 
+class ToolbarIcon {
+public:
+	string label;
+	string src;
+	ToolbarIcon(string label, string src) : label(label), src(src) {};
+};
+
+class Toolbar : public FormControl {
+private:
+	vector<ToolbarIcon> icons = {};
+	float iconWidth;
+	float iconHeight;
+	float margin;
+	int hoveredIcon = -1;
+public:
+	Toolbar(float x, float y) : FormControl("", x, y) {
+		setIconWidth(16.0);
+		setIconHeight(16.0);
+		setMargin(8.0);
+		setBackColor(Color(211.0, 211.0, 211.0, 1.0));
+		width = 0;
+		height = getIconHeight() + getMargin() * 2;
+	}
+	int getHoveredIcon() {
+		return hoveredIcon;
+	}
+	void setHoveredIcon(int newHoveredIcon) {
+		hoveredIcon = clamp(newHoveredIcon, -1, icons.size());
+	}
+	float getMargin() {
+		return margin;
+	}
+	void setMargin(float newMargin) {
+		margin = newMargin;
+	}
+	float getIconWidth() {
+		return iconWidth;
+	}
+	float getIconHeight() {
+		return iconHeight;
+	}
+	void setIconWidth(float newWidth) {
+		iconWidth = newWidth;
+	}
+	void setIconHeight(float newHeight) {
+		iconHeight = newHeight;
+	}
+	void Render() {
+		float x = this->x;
+		float y = this->y;
+		SetFillColor(getBackColor());
+		FillRect(x, y, width, height);
+		for (int i = 0, len = icons.size(); i < len; i++) {
+			if (i == getHoveredIcon()) {
+				SetFillColor(Color(161.0, 161.0, 161.0, 1.0));
+				FillRect(x, y, getIconWidth() + getMargin() * 2, getIconHeight() + getMargin() * 2);
+				SetFillColor(getBackColor());
+			}
+			DrawBitmap(icons[i].src, x + getMargin(), y + getMargin(), getIconWidth(), getIconHeight());
+			x += getIconWidth() + getMargin() * 2;
+		}
+	}
+	void AddIcon(string label, string src) {
+		icons.push_back(ToolbarIcon(label, src));
+		width = icons.size() * (getIconWidth() + getMargin() * 2);
+	}
+};
+
 class ComboBox : public FormControl {
 public:
 	vector<string> options;
@@ -545,11 +613,20 @@ void MainWindow::OnPaint()
 
 			for (int i = 0, len = controls.size(); i < len; i++) {
 				controls[i]->hover = false;
+				if (controls[i]->type == FormToolbar) {
+					Toolbar* toolbar = (Toolbar*)controls[i];
+					toolbar->setHoveredIcon(-1);
+				}
 			}
 
 			for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
 			{
-				selRegion->shapes[i]->control->hover = true;
+				FormControl* control = selRegion->shapes[i]->control;
+				control->hover = true;
+				if (control->type == FormToolbar) {
+					Toolbar* toolbar = (Toolbar*)control;
+					toolbar->setHoveredIcon(int(floor((pageX - toolbar->x) / (toolbar->getIconWidth() + toolbar->getMargin() * 2))));
+				}
 				StrokeRect(
 					selRegion->shapes[i]->x1,
 					selRegion->shapes[i]->y1,
@@ -600,6 +677,16 @@ void MainWindow::OnPaint()
 
 		if (mySlabContainer->NextAvailableShapeId == 1) {
 			float y = 10.0;
+			Toolbar* Toolbar1 = new Toolbar(10.0F, y);
+			Toolbar1->AddIcon("Back", "icons/back.png");
+			Toolbar1->AddIcon("Forward", "icons/forward.png");
+			Toolbar1->AddIcon("Home", "icons/home.png");
+			Toolbar1->AddIcon("Refresh", "icons/refresh.png");
+			Toolbar1->AddIcon("Stop", "icons/stop.png");
+			Toolbar1->AddIcon("History", "icons/history.png");
+			Toolbar1->AddIcon("Downloads", "icons/downloads.png");
+			Toolbar1->AddIcon("Bookmarks", "icons/bookmarks.png");
+			y += Toolbar1->height + 10.0;
 			Label* Label1 = new Label("Select Item:", 10.0F, y);
 			ComboBox1 = new ComboBox({ "Arial", "Tahoma", "Comic Sans MS", "Times New Roman", "Calibri", "Verdana" }, Label1->x + Label1->width + 10.0F, y);
 			Label1->target = ComboBox1;
@@ -650,6 +737,7 @@ void MainWindow::OnPaint()
 			y += RadioButton6->height + 10.0;
 			BitmapImage1 = new BitmapImage("logo.png", 10.0F, y, 160.0, 50.0);
 
+			controls.push_back(Toolbar1);
 			controls.push_back(Label1);
 			controls.push_back(ComboBox1);
 			controls.push_back(Label2);
