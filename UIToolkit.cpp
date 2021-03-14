@@ -198,6 +198,7 @@ class Label : public FormControl {
 public:
 	FormControl* target = nullptr;
 	Label(string label, float x, float y) : FormControl(label, x, y) {
+		type = FormLabel;
 		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
 		width = metrics.width;
 		height = metrics.height;
@@ -244,6 +245,7 @@ private:
 	int hoveredIcon = -1;
 public:
 	Toolbar(float x, float y) : FormControl("", x, y) {
+		type = FormToolbar;
 		setIconWidth(16.0);
 		setIconHeight(16.0);
 		setMargin(8.0);
@@ -966,9 +968,12 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 			}
 			else if (control->type == FormToolbar) {
 				Toolbar* toolbar = (Toolbar*)control;
-				ToolbarIcon& icon = toolbar->getIcon(toolbar->getHoveredIcon());
-				if (icon.clickHandler != nullptr) {
-					icon.clickHandler(icon);
+				if (toolbar != nullptr && toolbar->getHoveredIcon() != -1) {
+					ToolbarIcon& icon = toolbar->getIcon(toolbar->getHoveredIcon());
+					OutputDebugStringW(stringToLPCWSTR("getHoveredIcon(): " + std::to_string(toolbar->getHoveredIcon())));
+					if (icon.clickHandler && icon.clickHandler != nullptr) {
+						icon.clickHandler(icon);
+					}
 				}
 			}
 			if (control->clickHandler != nullptr) {
