@@ -60,6 +60,6 @@ private:
 };
 
 extern IDWriteFactory* m_pDWriteFactory;
-extern IDWriteTextFormat* m_pTextFormat;
+//extern IDWriteTextFormat* m_pTextFormat;
 
 extern ID2D1SolidColorBrush* m_pBlackBrush;

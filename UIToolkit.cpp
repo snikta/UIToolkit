@@ -36,7 +36,7 @@ ID2D1HwndRenderTarget* pRenderTarget = NULL;
 ID2D1SolidColorBrush* pFillBrush = nullptr;
 ID2D1SolidColorBrush* pStrokeBrush = nullptr;
 IDWriteFactory* m_pDWriteFactory = nullptr;
-IDWriteTextFormat* m_pTextFormat = nullptr;
+//IDWriteTextFormat* m_pTextFormat = nullptr;
 float lineWidth = 1.0;
 void FillRect(float x, float y, float width, float height) {
 	pRenderTarget->FillRectangle(D2D1::RectF(x, y, x + width, y + height), pFillBrush);
@@ -76,7 +76,7 @@ void SetLineWidth(float newLineWidth) {
 	lineWidth = newLineWidth;
 }
 
-void SetFont(string fontName, static const float fontSize, bool bold, bool italic) {
+/*void SetFont(string fontName, static const float fontSize, bool bold, bool italic) {
 	if (m_pTextFormat != nullptr) {
 		SafeRelease(m_pTextFormat);
 	}
@@ -96,9 +96,9 @@ void SetFont(string fontName, static const float fontSize, bool bold, bool itali
 		m_pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 		m_pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
 	}
-}
+}*/
 
-DWRITE_TEXT_METRICS MeasureText(string text) {
+DWRITE_TEXT_METRICS MeasureText(string text, IDWriteTextFormat* m_pTextFormat) {
 	IDWriteTextLayout* pTextLayout_ = NULL;
 	string s1 = text;
 	std::wstring widestr = std::wstring(s1.begin(), s1.end());
@@ -254,7 +254,7 @@ public:
 		StrokeRect(x, y, width, height);
 		SetFillColor(0.0, 0.0, 0.0);
 		FillText(value, x + 10, y + 5, m_pTextFormat);
-		DWRITE_TEXT_METRICS metrics = MeasureText(value.substr(0, charIndex));
+		DWRITE_TEXT_METRICS metrics = MeasureText(value.substr(0, charIndex), m_pTextFormat);
 		SetStrokeColor(30.0, 30.0, 30.0);
 		StrokeRect(x + 10 + metrics.widthIncludingTrailingWhitespace, y + 5, 1, metrics.height);
 	}
@@ -263,13 +263,13 @@ public:
 class Button : public FormControl {
 public:
 	Button(std::string label, float x, float y) : FormControl(label, x, y) {
-		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
 		type = FormButton;
 		width = metrics.width + 20;
 		height = metrics.height + 20;
 	};
 	void Render() {
-		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
 		if (hover) {
 			SetFillColor(161.0, 161.0, 161.0);
 		}
@@ -287,14 +287,15 @@ public:
 
 class RadioButton : public FormControl {
 public:
+	string groupName;
 	RadioButton(std::string label, float x, float y) : FormControl(label, x, y) {
-		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
 		type = FormRadioButton;
 		width = metrics.height + 10 + metrics.width;
 		height = metrics.height + 10;
 	};
 	void Render() {
-		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
 		SetFillColor(0.0, 0.0, 0.0);
 		SetStrokeColor(0.0, 0.0, 0.0);
 		string src = toggled ? "radiobutton.png" : "radiobutton_unchecked.png";
@@ -306,13 +307,13 @@ public:
 class Checkbox : public FormControl {
 public:
 	Checkbox(std::string label, float x, float y) : FormControl(label, x, y) {
-		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
 		type = FormCheckbox;
 		width = metrics.height + 10 + metrics.width;
 		height = metrics.height + 10;
 	};
 	void Render() {
-		DWRITE_TEXT_METRICS metrics = MeasureText(label);
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
 		SetFillColor(0.0, 0.0, 0.0);
 		SetStrokeColor(0.0, 0.0, 0.0);
 		string src = toggled ? "checkbox.png" : "checkbox_unchecked.png";
@@ -438,15 +439,59 @@ void SelectApollo() {
 	BitmapImage1->height = 152.0;
 }
 
-void addComboBoxItem() {
+void SelectImage(FormControl* control) {
+	float width;
+	float height;
+	if (control->label == "logo.png") {
+		width = 160.0;
+		height = 50.0;
+	}
+	else if (control->label == "apollo.jpg") {
+		width = 232.0;
+		height = 152.0;
+	}
+	else if (control->label == "browser_small.png") {
+		width = 320.0;
+		height = 164.0;
+	}
+	else if (control->label == "jpeg_small.png") {
+		width = 320.0;
+		height = 240.0;
+	}
+	else if (control->label == "stratolabs_.png") {
+		width = 335.0;
+		height = 339.0;
+	}
+	else {
+		return;
+	}
+	BitmapImage1->src = control->label;
+	BitmapImage1->width = width;
+	BitmapImage1->height = height;
+}
+
+void addComboBoxItem(FormControl* control) {
 	ComboBoxInFocus->options.push_back(TextboxInFocus->value);
 }
 
-void removeComboBoxItem() {
+void removeComboBoxItem(FormControl* control) {
 	if (ComboBoxInFocus->selectedIndex != -1) {
 		ComboBoxInFocus->options.erase(ComboBoxInFocus->options.begin() + ComboBoxInFocus->selectedIndex);
 		ComboBoxInFocus->selectedIndex = clamp(ComboBoxInFocus->selectedIndex - 1, 0, ComboBoxInFocus->options.size() - 1);
 	}
+}
+
+vector<RadioButton*> getRadioButtonsByGroupName(string groupName) {
+	vector<RadioButton*> retval;
+	for (int i = 0, len = controls.size(); i < len; i++) {
+		if (controls[i]->type == FormRadioButton) {
+			RadioButton* control = (RadioButton*)controls[i];
+			if (control->groupName == groupName) {
+				retval.push_back(control);
+			}
+		}
+	}
+	return retval;
 }
 
 void MainWindow::OnPaint()
@@ -483,31 +528,50 @@ void MainWindow::OnPaint()
 			}
 		}
 
-		/*SetStrokeColor(0.0, 0.0, 0.0);
+		IDWriteTextFormat* m_pTestTextFormat = nullptr;
+
+		HRESULT hr = m_pDWriteFactory->CreateTextFormat(
+			L"Courier New",
+			NULL,
+			DWRITE_FONT_WEIGHT_NORMAL,
+			DWRITE_FONT_STYLE_NORMAL,
+			DWRITE_FONT_STRETCH_NORMAL,
+			16,
+			L"", //locale
+			&m_pTestTextFormat
+		);
+		if (SUCCEEDED(hr))
+		{
+			// Center the text horizontally and vertically.
+			m_pTestTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+			m_pTestTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+		}
+
+		SetStrokeColor(0.0, 0.0, 0.0);
 
 		SetFillColor(255.0, 0.0, 0.0);
-		FillRect(10, 10, 100, 100);
-		StrokeRect(10, 120, 100, 100);
+		FillRect(10 + 500, 10, 100, 100);
+		StrokeRect(10 + 500, 120, 100, 100);
 
 		SetFillColor(255.0, 255.0, 0.0);
-		FillEllipse(120, 10, 100, 100);
-		StrokeEllipse(120, 120, 100, 100);
+		FillEllipse(120 + 500, 10, 100, 100);
+		StrokeEllipse(120 + 500, 120, 100, 100);
 
 		float y = 240.0;
-		DrawBitmap("logo.png", 10, y, 160, 50);
+		DrawBitmap("logo.png", 10 + 500, y, 160, 50);
 		y += 50.0;
 		SetFillColor(0.0, 0.0, 0.0);
 		y += 20.0;
-		DWRITE_TEXT_METRICS metrics = FillText("Copyright 2021 Snikta. All rights reserved.", 10, y);
-		y += metrics.height + 10;*/
+		DWRITE_TEXT_METRICS metrics = FillText("Copyright 2021 Snikta. All rights reserved.", 10 + 500, y, m_pTestTextFormat);
+		y += metrics.height + 10;
 
-		SetFont("Arial", 16, false, false);
+		SafeRelease(m_pTestTextFormat);
 
 		if (mySlabContainer->NextAvailableShapeId == 1) {
 			float y = 10.0;
 			ComboBox* ComboBox1 = new ComboBox({ "Arial", "Tahoma", "Comic Sans MS", "Times New Roman", "Calibri", "Verdana" }, 10.0F, y);
 			y += ComboBox1->height + 10.0;
-			ComboBox1->setFontName("Comic Sans MS");
+			ComboBox1->setFontName("Calibri");
 			ComboBox1->setBold(true);
 			Textbox* Textbox1 = new Textbox("Textbox1", 10.0F, y);
 			Textbox1->setFontName("Times New Roman");
@@ -526,11 +590,25 @@ void MainWindow::OnPaint()
 			Checkbox* Checkbox1 = new Checkbox("Checkbox1", 10.0F, y);
 			y += Checkbox1->height + 10.0;
 			RadioButton* RadioButton2 = new RadioButton("logo.png", 10.0F, y);
-			RadioButton2->clickHandler = SelectLogo;
+			RadioButton2->clickHandler = SelectImage;
+			RadioButton2->groupName = "ImageSelect";
 			y += RadioButton2->height + 10.0;
 			RadioButton* RadioButton3 = new RadioButton("apollo.jpg", 10.0F, y);
-			RadioButton3->clickHandler = SelectApollo;
+			RadioButton3->clickHandler = SelectImage;
+			RadioButton3->groupName = "ImageSelect";
 			y += RadioButton3->height + 10.0;
+			RadioButton* RadioButton4 = new RadioButton("browser_small.png", 10.0F, y);
+			RadioButton4->clickHandler = SelectImage;
+			RadioButton4->groupName = "ImageSelect";
+			y += RadioButton4->height + 10.0;
+			RadioButton* RadioButton5 = new RadioButton("jpeg_small.png", 10.0F, y);
+			RadioButton5->clickHandler = SelectImage;
+			RadioButton5->groupName = "ImageSelect";
+			y += RadioButton5->height + 10.0;
+			RadioButton* RadioButton6 = new RadioButton("stratolabs_.png", 10.0F, y);
+			RadioButton6->clickHandler = SelectImage;
+			RadioButton6->groupName = "ImageSelect";
+			y += RadioButton6->height + 10.0;
 			BitmapImage1 = new BitmapImage("logo.png", 10.0F, y, 160.0, 50.0);
 
 			controls.push_back(ComboBox1);
@@ -541,6 +619,9 @@ void MainWindow::OnPaint()
 			controls.push_back(Checkbox1);
 			controls.push_back(RadioButton2);
 			controls.push_back(RadioButton3);
+			controls.push_back(RadioButton4);
+			controls.push_back(RadioButton5);
+			controls.push_back(RadioButton6);
 			controls.push_back(BitmapImage1);
 
 			vector<Shape*> shapesToPreprocess;
@@ -712,29 +793,32 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 		controls[i]->focused = false;
 	}
 
-	for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
-	{
-		selRegion->shapes[i]->control->focused = true;
-		if (selRegion->shapes[i]->control->clickHandler != nullptr) {
-			selRegion->shapes[i]->control->clickHandler();
-		}
-		if (selRegion->shapes[i]->control->type == FormComboBox) {
-			ComboBoxInFocus = (ComboBox*)selRegion->shapes[i]->control;
-		}
-		if (selRegion->shapes[i]->control->type == FormTextbox) {
-			TextboxInFocus = (Textbox*)selRegion->shapes[i]->control;
-			int charIndex = 0;
-			int x = TextboxInFocus->x + 10;
-			while (charIndex < TextboxInFocus->value.size() && x < (TextboxInFocus->x + TextboxInFocus->width)) {
-				x = TextboxInFocus->x + 10 + MeasureText(TextboxInFocus->value.substr(0, charIndex + 1)).widthIncludingTrailingWhitespace;
-				charIndex++;
-				if (x >= pixelX) {
-					charIndex--;
-					break;
-				}
+	if (selRegion != nullptr) {
+		for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
+		{
+			FormControl* control = selRegion->shapes[i]->control;
+			control->focused = true;
+			if (control->clickHandler != nullptr) {
+				control->clickHandler(control);
 			}
-			TextboxInFocus->charIndex = clamp(charIndex, 0, TextboxInFocus->value.size());
-			OnPaint();
+			if (control->type == FormComboBox) {
+				ComboBoxInFocus = (ComboBox*)control;
+			}
+			if (control->type == FormTextbox) {
+				TextboxInFocus = (Textbox*)control;
+				int charIndex = 0;
+				int x = TextboxInFocus->x + 10;
+				while (charIndex < TextboxInFocus->value.size() && x < (TextboxInFocus->x + TextboxInFocus->width)) {
+					x = TextboxInFocus->x + 10 + MeasureText(TextboxInFocus->value.substr(0, charIndex + 1), TextboxInFocus->m_pTextFormat).widthIncludingTrailingWhitespace;
+					charIndex++;
+					if (x >= pixelX) {
+						charIndex--;
+						break;
+					}
+				}
+				TextboxInFocus->charIndex = clamp(charIndex, 0, TextboxInFocus->value.size());
+				OnPaint();
+			}
 		}
 	}
 }
@@ -743,7 +827,19 @@ void MainWindow::OnLButtonUp() {
 	if (selRegion != nullptr) {
 		for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
 		{
-			selRegion->shapes[i]->control->toggled = !selRegion->shapes[i]->control->toggled;
+			FormControl* control = selRegion->shapes[i]->control;
+			control->toggled = !control->toggled;
+			if (control->toggled == true) {
+				if (control->type == FormRadioButton) {
+					RadioButton* radioButton = (RadioButton*)control;
+					vector<RadioButton*> radioButtonGroup = getRadioButtonsByGroupName(radioButton->groupName);
+					for (int j = 0, jLen = radioButtonGroup.size(); j < jLen; j++) {
+						if (radioButtonGroup[j] != radioButton) {
+							radioButtonGroup[j]->toggled = false;
+						}
+					}
+				}
+			}
 		}
 		OnPaint();
 	}

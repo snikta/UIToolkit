@@ -30,7 +30,7 @@ HRESULT DemoApp::CreateDeviceIndependentResources()
 			reinterpret_cast<IUnknown **>(&m_pDWriteFactory)
 		);
 	//}
-	if (SUCCEEDED(hr))
+	/*if (SUCCEEDED(hr))
 	{
 		// Create a DirectWrite text format object.
 		hr = m_pDWriteFactory->CreateTextFormat(
@@ -49,7 +49,7 @@ HRESULT DemoApp::CreateDeviceIndependentResources()
 		// Center the text horizontally and vertically.
 		m_pTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 		m_pTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-	}
+	}*/
 
 	return hr;
 }

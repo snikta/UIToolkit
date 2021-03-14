@@ -35,7 +35,7 @@ public:
 	bool focused = false;
 	bool toggled = false;
 	bool hover = false;
-	void (*clickHandler)() = nullptr;
+	void (*clickHandler)(FormControl *control) = nullptr;
 	void setFontName(std::string newFontName);
 	void setFontSize(int newFontSize);
 	void setBold(bool boldValue);
