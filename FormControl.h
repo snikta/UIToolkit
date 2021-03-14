@@ -3,7 +3,7 @@
 #include "WICViewerD2D.h"
 
 extern IDWriteFactory* m_pDWriteFactory;
-enum FormControlType { FormComboBox, FormButton, FormTextbox, FormRadioButton, FormCheckbox };
+enum FormControlType { FormLabel, FormComboBox, FormButton, FormTextbox, FormRadioButton, FormCheckbox };
 
 class Color {
 public:

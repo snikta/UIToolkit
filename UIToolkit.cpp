@@ -64,11 +64,32 @@ HRESULT SetFillColor(float red, float green, float blue) {
 	HRESULT hr = pRenderTarget->CreateSolidColorBrush(color, &pFillBrush);
 	return hr;
 }
+HRESULT SetFillColor(Color newColor) {
+	if (pFillBrush != nullptr) {
+		SafeRelease(pFillBrush);
+	}
+	const D2D1_COLOR_F color = D2D1::ColorF(
+		newColor.red / 255.0,
+		newColor.green / 255.0,
+		newColor.blue / 255.0,
+		newColor.alpha
+	);
+	HRESULT hr = pRenderTarget->CreateSolidColorBrush(color, &pFillBrush);
+	return hr;
+}
 HRESULT SetStrokeColor(float red, float green, float blue) {
 	if (pStrokeBrush != nullptr) {
 		SafeRelease(pStrokeBrush);
 	}
 	const D2D1_COLOR_F color = D2D1::ColorF(red / 255.0, green / 255.0, blue / 255.0);
+	HRESULT hr = pRenderTarget->CreateSolidColorBrush(color, &pStrokeBrush);
+	return hr;
+}
+HRESULT SetStrokeColor(Color newColor) {
+	if (pStrokeBrush != nullptr) {
+		SafeRelease(pStrokeBrush);
+	}
+	const D2D1_COLOR_F color = D2D1::ColorF(newColor.red / 255.0, newColor.green / 255.0, newColor.blue / 255.0);
 	HRESULT hr = pRenderTarget->CreateSolidColorBrush(color, &pStrokeBrush);
 	return hr;
 }
@@ -173,6 +194,22 @@ void DrawBitmap(string src, float x, float y, float width, float height) {
 	}
 }
 
+class Label : public FormControl {
+public:
+	FormControl* target = nullptr;
+	Label(string label, float x, float y) : FormControl(label, x, y) {
+		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
+		width = metrics.width;
+		height = metrics.height;
+	};
+	void Render() {
+		SetFillColor(getBackColor());
+		FillRect(x, y, width, height);
+		SetFillColor(getForeColor());
+		FillText(label, x, y, m_pTextFormat);
+	}
+};
+
 class BitmapImage : public FormControl {
 public:
 	string src;
@@ -199,31 +236,32 @@ public:
 		if (options.size() > 0) {
 			selectedIndex = 0;
 		}
+		setBackColor(Color(255.0, 255.0, 255.0, 1.0));
 	}
 	void Render() {
 		if (focused) {
 			SetFillColor(211.0, 211.0, 211.0);
 		}
 		else {
-			SetFillColor(255.0, 255.0, 255.0);
+			SetFillColor(getBackColor());
 		}
 		SetStrokeColor(161.0, 161.0, 161.0);
 		FillRect(x, y, width, height);
 		StrokeRect(x, y, width, height);
-		SetFillColor(0.0, 0.0, 0.0);
+		SetFillColor(getForeColor());
 		DWRITE_TEXT_METRICS metrics = FillText(selectedIndex == -1 ? "" : options[selectedIndex], x + 10, y + 5, m_pTextFormat);
 		DrawBitmap("menu_open.png", x + width - 24 - 5, y + 5, 24, 24);
 		if (toggled) {
-			SetFillColor(255.0, 255.0, 255.0);
+			SetFillColor(getBackColor());
 			StrokeRect(x, y + height, width, (metrics.height + 20) * options.size() + 10);
 			FillRect(x, y + height, width, (metrics.height + 20) * options.size() + 10);
 			float optionY = y + height + 10.0;
-			SetFillColor(0.0, 0.0, 0.0);
+			SetFillColor(getForeColor());
 			for (int i = 0, len = options.size(); i < len; i++) {
 				if (pageY > (optionY - 10.0) && pageY < (optionY + metrics.height + 10.0)) {
 					SetFillColor(211.0, 211.0, 211.0);
 					FillRect(x, optionY - 10.0, width, metrics.height + 20);
-					SetFillColor(0.0, 0.0, 0.0);
+					SetFillColor(getForeColor());
 				}
 				FillText(options[i], x + 10, optionY, m_pTextFormat);
 				optionY += metrics.height + 20;
@@ -241,13 +279,14 @@ public:
 		type = FormTextbox;
 		width = 150.0;
 		height = 30.0;
+		setBackColor(Color(255.0, 255.0, 255.0, 1.0));
 	};
 	void Render() {
 		if (focused) {
 			SetFillColor(211.0, 211.0, 211.0);
 		}
 		else {
-			SetFillColor(255.0, 255.0, 255.0);
+			SetFillColor(getBackColor());
 		}
 		SetStrokeColor(161.0, 161.0, 161.0);
 		FillRect(x, y, width, height);
@@ -267,6 +306,7 @@ public:
 		type = FormButton;
 		width = metrics.width + 20;
 		height = metrics.height + 20;
+		setBackColor(Color(211.0, 211.0, 211.0, 1.0));
 	};
 	void Render() {
 		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
@@ -274,7 +314,7 @@ public:
 			SetFillColor(161.0, 161.0, 161.0);
 		}
 		else {
-			SetFillColor(211.0, 211.0, 211.0);
+			SetFillColor(getBackColor());
 		}
 		FillRect(x, y, 20 + metrics.width, 20 + metrics.height);
 		SetStrokeColor(0.0, 0.0, 0.0);
@@ -296,8 +336,9 @@ public:
 	};
 	void Render() {
 		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
-		SetFillColor(0.0, 0.0, 0.0);
-		SetStrokeColor(0.0, 0.0, 0.0);
+		SetFillColor(getBackColor());
+		FillRect(x, y, width, height);
+		SetFillColor(getForeColor());
 		string src = toggled ? "radiobutton.png" : "radiobutton_unchecked.png";
 		DrawBitmap(src, x, y, metrics.height, metrics.height);
 		FillText(label, x + metrics.height + 10, y, m_pTextFormat);
@@ -314,8 +355,9 @@ public:
 	};
 	void Render() {
 		DWRITE_TEXT_METRICS metrics = MeasureText(label, m_pTextFormat);
-		SetFillColor(0.0, 0.0, 0.0);
-		SetStrokeColor(0.0, 0.0, 0.0);
+		SetFillColor(getBackColor());
+		FillRect(x, y, width, height);
+		SetFillColor(getForeColor());
 		string src = toggled ? "checkbox.png" : "checkbox_unchecked.png";
 		DrawBitmap(src, x, y, metrics.height, metrics.height);
 		FillText(label, x + metrics.height + 10, y, m_pTextFormat);
@@ -324,6 +366,7 @@ public:
 
 Textbox* TextboxInFocus = nullptr;
 ComboBox* ComboBoxInFocus = nullptr;
+ComboBox* ComboBox1 = nullptr;
 
 class MainWindow : public BaseWindow<MainWindow>
 {
@@ -427,18 +470,6 @@ void MainWindow::DiscardGraphicsResources()
 
 BitmapImage* BitmapImage1;
 
-void SelectLogo() {
-	BitmapImage1->src = "logo.png";
-	BitmapImage1->width = 160.0;
-	BitmapImage1->height = 50.0;
-}
-
-void SelectApollo() {
-	BitmapImage1->src = "apollo.jpg";
-	BitmapImage1->width = 232.0;
-	BitmapImage1->height = 152.0;
-}
-
 void SelectImage(FormControl* control) {
 	float width;
 	float height;
@@ -471,13 +502,13 @@ void SelectImage(FormControl* control) {
 }
 
 void addComboBoxItem(FormControl* control) {
-	ComboBoxInFocus->options.push_back(TextboxInFocus->value);
+	ComboBox1->options.push_back(TextboxInFocus->value);
 }
 
 void removeComboBoxItem(FormControl* control) {
-	if (ComboBoxInFocus->selectedIndex != -1) {
-		ComboBoxInFocus->options.erase(ComboBoxInFocus->options.begin() + ComboBoxInFocus->selectedIndex);
-		ComboBoxInFocus->selectedIndex = clamp(ComboBoxInFocus->selectedIndex - 1, 0, ComboBoxInFocus->options.size() - 1);
+	if (ComboBox1->selectedIndex != -1) {
+		ComboBox1->options.erase(ComboBox1->options.begin() + ComboBox1->selectedIndex);
+		ComboBox1->selectedIndex = clamp(ComboBox1->selectedIndex - 1, 0, ComboBox1->options.size() - 1);
 	}
 }
 
@@ -569,16 +600,24 @@ void MainWindow::OnPaint()
 
 		if (mySlabContainer->NextAvailableShapeId == 1) {
 			float y = 10.0;
-			ComboBox* ComboBox1 = new ComboBox({ "Arial", "Tahoma", "Comic Sans MS", "Times New Roman", "Calibri", "Verdana" }, 10.0F, y);
+			Label* Label1 = new Label("Select Item:", 10.0F, y);
+			ComboBox1 = new ComboBox({ "Arial", "Tahoma", "Comic Sans MS", "Times New Roman", "Calibri", "Verdana" }, Label1->x + Label1->width + 10.0F, y);
+			Label1->target = ComboBox1;
 			y += ComboBox1->height + 10.0;
 			ComboBox1->setFontName("Calibri");
 			ComboBox1->setBold(true);
-			Textbox* Textbox1 = new Textbox("Textbox1", 10.0F, y);
+			ComboBox1->setBackColor(Color(0.0, 0.0, 128.0, 1.0));
+			ComboBox1->setForeColor(Color(255.0, 255.0, 255.0, 1.0));
+			Label* Label2 = new Label("New Item:", 10.0F, y);
+			Textbox* Textbox1 = new Textbox("Textbox1", Label2->x + Label2->width + 10.0F, y);
+			Textbox1->setBackColor(Color(255.0, 255.0, 0.0, 1.0));
+			Label2->target = Textbox1;
 			Textbox1->setFontName("Times New Roman");
 			y += Textbox1->height + 10.0;
 			Button* Button1 = new Button("Add", 10.0F, y);
 			Button1->clickHandler = addComboBoxItem;
-			Button1->setForeColor(Color(255.0F, 0.0F, 0.0F, 1.0F));
+			Button1->setForeColor(Color(255.0F, 255.0F, 255.0F, 1.0F));
+			Button1->setBackColor(Color(128.0F, 0.0F, 0.0F, 1.0F));
 			Button1->setBold(true);
 			Button1->setItalic(true);
 			y += Button1->height + 10.0;
@@ -611,7 +650,9 @@ void MainWindow::OnPaint()
 			y += RadioButton6->height + 10.0;
 			BitmapImage1 = new BitmapImage("logo.png", 10.0F, y, 160.0, 50.0);
 
+			controls.push_back(Label1);
 			controls.push_back(ComboBox1);
+			controls.push_back(Label2);
 			controls.push_back(Textbox1);
 			controls.push_back(Button1);
 			controls.push_back(Button2);
@@ -798,6 +839,20 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 		{
 			FormControl* control = selRegion->shapes[i]->control;
 			control->focused = true;
+			if (control->type == FormLabel) {
+				Label* label = (Label*)control;
+				if (label->target != nullptr) {
+					label->target->focused = true;
+					if (label->target->type == FormTextbox) {
+						TextboxInFocus = (Textbox*)label->target;
+					}
+					else if (label->target->type == FormComboBox) {
+						ComboBoxInFocus = (ComboBox*)label->target;
+						ComboBoxInFocus->toggled = true;
+					}
+					OnPaint();
+				}
+			}
 			if (control->clickHandler != nullptr) {
 				control->clickHandler(control);
 			}
