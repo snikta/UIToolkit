@@ -227,7 +227,12 @@ class ToolbarIcon {
 public:
 	string label;
 	string src;
-	ToolbarIcon(string label, string src) : label(label), src(src) {};
+	ToolbarIcon(string label, string src, void (*clickHandler)(ToolbarIcon& icon)) : label(label), src(src) {
+		if (clickHandler != nullptr) {
+			this->clickHandler = clickHandler;
+		}
+	};
+	void (*clickHandler)(ToolbarIcon &icon) = nullptr;
 };
 
 class Toolbar : public FormControl {
@@ -245,6 +250,12 @@ public:
 		setBackColor(Color(211.0, 211.0, 211.0, 1.0));
 		width = 0;
 		height = getIconHeight() + getMargin() * 2;
+	}
+	ToolbarIcon& getIcon(int iconIndex) {
+		if (iconIndex >= 0 && iconIndex <= icons.size() - 1) {
+			return icons[iconIndex];
+		}
+		return icons[0];
 	}
 	int getHoveredIcon() {
 		return hoveredIcon;
@@ -285,8 +296,8 @@ public:
 			x += getIconWidth() + getMargin() * 2;
 		}
 	}
-	void AddIcon(string label, string src) {
-		icons.push_back(ToolbarIcon(label, src));
+	void AddIcon(string label, string src, void (*clickHandler)(ToolbarIcon& icon)) {
+		icons.push_back(ToolbarIcon(label, src, clickHandler));
 		width = icons.size() * (getIconWidth() + getMargin() * 2);
 	}
 };
@@ -580,6 +591,18 @@ void removeComboBoxItem(FormControl* control) {
 	}
 }
 
+void ClickBack(ToolbarIcon& icon) {
+	MessageBox(NULL, L"Going back one page...", L"Back", MB_OK);
+}
+
+void ClickForward(ToolbarIcon& icon) {
+	MessageBox(NULL, L"Going forward one page...", L"Forward", MB_OK);
+}
+
+void ClickHome(ToolbarIcon& icon) {
+	MessageBox(NULL, L"Loading the home page!", L"Home", MB_OK);
+}
+
 vector<RadioButton*> getRadioButtonsByGroupName(string groupName) {
 	vector<RadioButton*> retval;
 	for (int i = 0, len = controls.size(); i < len; i++) {
@@ -678,14 +701,14 @@ void MainWindow::OnPaint()
 		if (mySlabContainer->NextAvailableShapeId == 1) {
 			float y = 10.0;
 			Toolbar* Toolbar1 = new Toolbar(10.0F, y);
-			Toolbar1->AddIcon("Back", "icons/back.png");
-			Toolbar1->AddIcon("Forward", "icons/forward.png");
-			Toolbar1->AddIcon("Home", "icons/home.png");
-			Toolbar1->AddIcon("Refresh", "icons/refresh.png");
-			Toolbar1->AddIcon("Stop", "icons/stop.png");
-			Toolbar1->AddIcon("History", "icons/history.png");
-			Toolbar1->AddIcon("Downloads", "icons/downloads.png");
-			Toolbar1->AddIcon("Bookmarks", "icons/bookmarks.png");
+			Toolbar1->AddIcon("Back", "icons/back.png", ClickBack);
+			Toolbar1->AddIcon("Forward", "icons/forward.png", ClickForward);
+			Toolbar1->AddIcon("Home", "icons/home.png", ClickHome);
+			Toolbar1->AddIcon("Refresh", "icons/refresh.png", nullptr);
+			Toolbar1->AddIcon("Stop", "icons/stop.png", nullptr);
+			Toolbar1->AddIcon("History", "icons/history.png", nullptr);
+			Toolbar1->AddIcon("Downloads", "icons/downloads.png", nullptr);
+			Toolbar1->AddIcon("Bookmarks", "icons/bookmarks.png", nullptr);
 			y += Toolbar1->height + 10.0;
 			Label* Label1 = new Label("Select Item:", 10.0F, y);
 			ComboBox1 = new ComboBox({ "Arial", "Tahoma", "Comic Sans MS", "Times New Roman", "Calibri", "Verdana" }, Label1->x + Label1->width + 10.0F, y);
@@ -939,6 +962,13 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 						ComboBoxInFocus->toggled = true;
 					}
 					OnPaint();
+				}
+			}
+			else if (control->type == FormToolbar) {
+				Toolbar* toolbar = (Toolbar*)control;
+				ToolbarIcon& icon = toolbar->getIcon(toolbar->getHoveredIcon());
+				if (icon.clickHandler != nullptr) {
+					icon.clickHandler(icon);
 				}
 			}
 			if (control->clickHandler != nullptr) {
