@@ -312,20 +312,20 @@ void RedBlackTree::deleteNodeFixup(RedBlackNode* x)
 	}
 	x->color = black;
 };
-RedBlackNode* RedBlackTree::deleteNode(RedBlackNode& z)
+RedBlackNode* RedBlackTree::deleteNode(RedBlackNode* z)
 {
 	RedBlackNode* x;
 	RedBlackNode* y;
-	if (&z == nil) {
+	if (z == nil) {
 		return nil;
 	}
-	if (z.left == nil || z.right == nil)
+	if (z->left == nil || z->right == nil)
 	{
-		y = &z;
+		y = z;
 	}
 	else
 	{
-		y = successor(&z);
+		y = successor(z);
 	}
 	if (y->left == nil)
 	{
@@ -351,9 +351,9 @@ RedBlackNode* RedBlackTree::deleteNode(RedBlackNode& z)
 			y->parent->right = x;
 		}
 	}
-	if (y != &z)
+	if (y != z)
 	{
-		z.key = y->key;
+		z->key = y->key;
 		// copy any other fields
 	}
 	if (y->color == black)

@@ -15,6 +15,8 @@ public:
 	Color(float red, float green, float blue, float alpha) : red(red), green(green), blue(blue), alpha(alpha) {};
 };
 
+class Shape;
+
 class FormControl {
 private:
 	std::string fontName = "Arial";
@@ -25,6 +27,7 @@ private:
 	Color backColor = Color(0.0, 0.0, 0.0, 0.0);
 	void setTextFormat();
 public:
+	Shape* ptrShape = nullptr;
 	IDWriteTextFormat* m_pTextFormat = nullptr;
 	FormControlType type;
 	std::string label;

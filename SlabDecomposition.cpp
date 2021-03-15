@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "SlabDecomposition.h"
 #include "RedBlackTree.h"
+#include "stringToLPCWSTR.h"
 #include <vector>
 #include <d2d1.h>
 using std::vector;
@@ -26,7 +27,7 @@ Slab::~Slab() {
 	}
 }
 
-Region* Slab::makeRegion(int topY, int bottomY, vector<Shape*>& shapesToCopy)
+Region* Slab::makeRegion(int topY, int bottomY, vector<Shape*> shapesToCopy)
 {
 	Region* newRegion = new Region;
 
@@ -45,16 +46,16 @@ Region* Slab::makeRegion(int topY, int bottomY, vector<Shape*>& shapesToCopy)
 
 	return newRegion;
 }
-void Slab::addShape(Shape& shape)
+void Slab::addShape(Shape* shape)
 {
-	int y1 = shape.y1, y2 = shape.y2, y = y1;
+	int y1 = shape->y1, y2 = shape->y2, y = y1;
 
-	this->prepareBoundLineGivenYPoint(y1, true, y2, shape.id);
-	this->prepareBoundLineGivenYPoint(y2, false, y1, shape.id);
+	this->prepareBoundLineGivenYPoint(y1, true, y2, shape->id);
+	this->prepareBoundLineGivenYPoint(y2, false, y1, shape->id);
 
-	if (find(this->shapeIds.begin(), this->shapeIds.end(), shape.id) == this->shapeIds.end())
+	if (find(this->shapeIds.begin(), this->shapeIds.end(), shape->id) == this->shapeIds.end())
 	{
-		this->shapeIds.push_back(shape.id);
+		this->shapeIds.push_back(shape->id);
 		this->shapeCount++;
 	}
 
@@ -103,9 +104,9 @@ void Slab::addShape(Shape& shape)
 			currentRegion = this->makeRegion(y, regionExists ? regionKey : y2, emptyShapes);
 		}
 		y = currentRegion->bottomY;
-		if (find(currentRegion->shapes.begin(), currentRegion->shapes.end(), &shape) == currentRegion->shapes.end())
+		if (find(currentRegion->shapes.begin(), currentRegion->shapes.end(), shape) == currentRegion->shapes.end())
 		{
-			currentRegion->shapes.push_back(&shape);
+			currentRegion->shapes.push_back(shape);
 		}
 	}
 }
@@ -180,7 +181,7 @@ void Slab::prepareBoundLineGivenYPoint(int lineY, bool isTopOfBBox, int edgeWeMi
 				}
 			}
 
-			vector<Shape*> emptyShapes;
+			vector<Shape*> emptyShapes = {};
 			this->makeRegion(min(lineY, otherEdge), max(lineY, otherEdge), emptyShapes);
 		}
 	}
@@ -189,8 +190,8 @@ void Slab::deleteRegion(int topY)
 {
 	int oldRegionBottomY = this->RegionsByTop[topY]->bottomY;
 
-	this->RBTRegions->deleteNode(*(this->RBTRegions->search(topY)));
-	this->RBTRegions->deleteNode(*(this->RBTRegions->search(oldRegionBottomY))); // what if oldRegion.bottomY is topY of next region?
+	this->RBTRegions->deleteNode(this->RBTRegions->search(topY));
+	this->RBTRegions->deleteNode(this->RBTRegions->search(oldRegionBottomY)); // what if oldRegion.bottomY is topY of next region?
 
 	delete RegionsByTop[topY];
 	this->RegionsByTop.erase(topY);
@@ -199,18 +200,17 @@ void Slab::splitRegion(int topY, int splitY)
 {
 	Region* regionToSplit = this->RegionsByTop[topY];
 	int bottomY = regionToSplit->bottomY;
-	vector<Shape*>* shapes = &(regionToSplit->shapes);
+	vector<Shape*> shapesToCopy = regionToSplit->shapes;
 
 	this->deleteRegion(topY);
-	this->makeRegion(topY, splitY, *shapes);
-	this->makeRegion(splitY, bottomY, *shapes);
+	this->makeRegion(topY, splitY, shapesToCopy);
+	this->makeRegion(splitY, bottomY, shapesToCopy);
 
 	// only need to create one new region
 }
 
-void SlabContainer::preprocessSubdivision(vector<Shape*>& shapesToAdd, char oType, Slab& slab)
+void SlabContainer::preprocessSubdivision(vector<Shape*> shapesToAdd, char oType, Slab& slab)
 {
-	//MessageBox(NULL, L"Invoking preprocessSubdivision", L"", MB_OK);
 	map<int, vector<Shape*>> ords;
 	vector<int> sortedOrds;
 	int edgeOrd, prevO;
@@ -218,6 +218,7 @@ void SlabContainer::preprocessSubdivision(vector<Shape*>& shapesToAdd, char oTyp
 	for (int i = 0, len = shapesToAdd.size(); i < len; i++)
 	{
 		Shape* s = shapesToAdd[i];
+		s->control->ptrShape = s;
 
 		int o1, o2;
 		if (oType == 'x')
@@ -317,13 +318,14 @@ void SlabContainer::preprocessSubdivision(vector<Shape*>& shapesToAdd, char oTyp
 		}
 	}
 };
-void SlabContainer::addShape(Shape& shape)
+void SlabContainer::addShape(Shape* shape)
 {
-	int x1 = shape.x1, x2 = shape.x2;
+	shape->control->ptrShape = shape;
+	int x1 = shape->x1, x2 = shape->x2;
 
 	// they should now both exist as slab lines we can use as bound lines
-	this->prepareBoundLineGivenXPoint(x1, true, x2, shape.id);
-	this->prepareBoundLineGivenXPoint(x2, false, x1, shape.id);
+	this->prepareBoundLineGivenXPoint(x1, true, x2, shape->id);
+	this->prepareBoundLineGivenXPoint(x2, false, x1, shape->id);
 
 	int x = x1;
 	bool slabExists = false;
@@ -337,10 +339,10 @@ void SlabContainer::addShape(Shape& shape)
 		if (slabExists)
 		{
 			currentSlab = this->SlabLinesByLeft[x];
-			RedBlackNode* cur = this->RBTSlabLines.search(currentSlab->leftX);
-			RedBlackNode* succ = cur == this->RBTSlabLines.nil ? this->RBTSlabLines.nil : this->RBTSlabLines.successor(cur);
+			RedBlackNode* cur = this->RBTSlabLines->search(currentSlab->leftX);
+			RedBlackNode* succ = cur == this->RBTSlabLines->nil ? this->RBTSlabLines->nil : this->RBTSlabLines->successor(cur);
 
-			if (cur != this->RBTSlabLines.nil && succ != this->RBTSlabLines.nil && succ != cur)
+			if (cur != this->RBTSlabLines->nil && succ != this->RBTSlabLines->nil && succ != cur)
 			{
 				if (currentSlab->rightX == succ->key)
 				{
@@ -350,9 +352,9 @@ void SlabContainer::addShape(Shape& shape)
 					// but we do have to make sure the Y-values for the top and bottom of the bounding box are included as a region. boo!
 
 					currentSlab->addShape(shape);
-					if (find(shape.slabs.begin(), shape.slabs.end(), currentSlab) == shape.slabs.end())
+					if (find(shape->slabs.begin(), shape->slabs.end(), currentSlab) == shape->slabs.end())
 					{
-						shape.slabs.push_back(currentSlab);
+						shape->slabs.push_back(currentSlab);
 					}
 				}
 			}
@@ -362,15 +364,15 @@ void SlabContainer::addShape(Shape& shape)
 		{
 			// no slab here; we need to create one. :-(
 
-			RedBlackNode* node = this->RBTSlabLines.closest(x);
+			RedBlackNode* node = this->RBTSlabLines->closest(x);
 			slabExists = false;
 			int slabKey;
 
-			if (node != this->RBTSlabLines.nil)
+			if (node != this->RBTSlabLines->nil)
 			{
 				if (node->key <= x)
 				{
-					slabKey = this->RBTSlabLines.successor(node)->key;
+					slabKey = this->RBTSlabLines->successor(node)->key;
 				}
 				else
 				{
@@ -381,15 +383,15 @@ void SlabContainer::addShape(Shape& shape)
 
 			int innerX2 = slabExists ? slabKey : x2;
 			map<int, Region*> emptyRegions;
-			vector<int> shapeIds = { shape.id };
+			vector<int> shapeIds = { shape->id };
 			currentSlab = this->makeSlab(x, innerX2, emptyRegions, 1, shapeIds);
-			if (find(shape.slabs.begin(), shape.slabs.end(), currentSlab) == shape.slabs.end())
+			if (find(shape->slabs.begin(), shape->slabs.end(), currentSlab) == shape->slabs.end())
 			{
-				shape.slabs.push_back(currentSlab);
+				shape->slabs.push_back(currentSlab);
 			}
 			// now we need to insert the Y-values for the top and bottom of the bounding box to form a region
-			vector<Shape*> shapesToCopy = { &shape };
-			currentSlab->makeRegion(shape.y1, shape.y2, shapesToCopy);
+			vector<Shape*> shapesToCopy = { shape };
+			currentSlab->makeRegion(shape->y1, shape->y2, shapesToCopy);
 		}
 		x = currentSlab->rightX;
 	}
@@ -416,8 +418,8 @@ Slab* SlabContainer::cloneSlab(int leftX, int rightX, Slab& oldSlab)
 		ShapeMembers[newSlab->shapeIds[i]]->slabs.push_back(newSlab);
 	}
 
-	this->RBTSlabLines.insert(leftX);
-	this->RBTSlabLines.insert(rightX);
+	this->RBTSlabLines->insert(leftX);
+	this->RBTSlabLines->insert(rightX);
 
 	map<int, Region*>::iterator it;
 	for (it = oldSlab.RegionsByTop.begin(); it != oldSlab.RegionsByTop.end(); ++it) {
@@ -430,7 +432,7 @@ Slab* SlabContainer::cloneSlab(int leftX, int rightX, Slab& oldSlab)
 
 	return newSlab;
 };
-Slab* SlabContainer::makeSlab(int leftX, int rightX, map<int, Region*>& regionsToPaste, int shapeCount, vector<int>& shapeIds)
+Slab* SlabContainer::makeSlab(int leftX, int rightX, map<int, Region*> regionsToPaste, int shapeCount, vector<int> shapeIds)
 {
 	Slab* newSlab = new Slab;
 	newSlab->shapeCount = shapeCount;
@@ -441,8 +443,8 @@ Slab* SlabContainer::makeSlab(int leftX, int rightX, map<int, Region*>& regionsT
 		ShapeMembers[shapeIds[i]]->slabs.push_back(newSlab);
 	}
 
-	this->RBTSlabLines.insert(leftX);
-	this->RBTSlabLines.insert(rightX);
+	this->RBTSlabLines->insert(leftX);
+	this->RBTSlabLines->insert(rightX);
 
 	map<int, Region*>::iterator it;
 	for (it = regionsToPaste.begin(); it != regionsToPaste.end(); ++it) {
@@ -466,14 +468,14 @@ void SlabContainer::deleteSlab(int leftX)//, bool keepRegions)
 	Slab* oldSlab = this->SlabLinesByLeft[leftX];
 	Slab* predSlab = &nilSlab;
 	RedBlackNode* pred;
-	RedBlackTree* rbt = &(this->RBTSlabLines);
+	RedBlackTree* rbt = this->RBTSlabLines;
 
 	pred = rbt->predecessor(rbt->search(leftX));
 	if (pred != rbt->nil)
 	{
 		if (!(this->SlabLinesByLeft.find(pred->key) != this->SlabLinesByLeft.end() && predSlab->rightX == leftX))
 		{
-			rbt->deleteNode(*(rbt->search(leftX)));
+			rbt->deleteNode(rbt->search(leftX));
 		}
 	}
 	RedBlackNode* succ = rbt->search(oldSlab->rightX);
@@ -481,7 +483,7 @@ void SlabContainer::deleteSlab(int leftX)//, bool keepRegions)
 	{
 		if (!(this->SlabLinesByLeft.find(succ->key) != this->SlabLinesByLeft.end()))
 		{
-			rbt->deleteNode(*(rbt->search(oldSlab->rightX)));
+			rbt->deleteNode(rbt->search(oldSlab->rightX));
 		}
 	}
 
@@ -511,13 +513,13 @@ void SlabContainer::splitSlab(int leftX, int splitX)
 };
 SlabContainer::verticalLineCheckResponse SlabContainer::checkIfVerticalLineLiesInExistingSlab(int lineX)
 {
-	RedBlackNode* tempLineNode = this->RBTSlabLines.insert(lineX);
-	RedBlackNode* tempPred = this->RBTSlabLines.predecessor(tempLineNode);
-	RedBlackNode* tempSucc = this->RBTSlabLines.successor(tempLineNode);
+	RedBlackNode* tempLineNode = this->RBTSlabLines->insert(lineX);
+	RedBlackNode* tempPred = this->RBTSlabLines->predecessor(tempLineNode);
+	RedBlackNode* tempSucc = this->RBTSlabLines->successor(tempLineNode);
 	bool functionHasWorkedAtThisPoint = false;
 	SlabContainer::verticalLineCheckResponse response;
 
-	if (tempPred != this->RBTSlabLines.nil && tempSucc != this->RBTSlabLines.nil)
+	if (tempPred != this->RBTSlabLines->nil && tempSucc != this->RBTSlabLines->nil)
 	{
 		map<int, Slab*>::iterator it = this->SlabLinesByLeft.find(tempPred->key);
 		if (it != this->SlabLinesByLeft.end())
@@ -531,12 +533,12 @@ SlabContainer::verticalLineCheckResponse SlabContainer::checkIfVerticalLineLiesI
 	}
 
 	response.inExistingSlab = functionHasWorkedAtThisPoint;
-	if (tempPred != this->RBTSlabLines.nil)
+	if (tempPred != this->RBTSlabLines->nil)
 	{
 		response.hasLeft = true;
 		response.xOfLeftLine = tempPred->key;
 	}
-	if (tempSucc != this->RBTSlabLines.nil)
+	if (tempSucc != this->RBTSlabLines->nil)
 	{
 		response.hasRight = true;
 		response.xOfRightLine = tempSucc->key;
@@ -548,7 +550,7 @@ void SlabContainer::prepareBoundLineGivenXPoint(int lineX, bool isLeftOfBBox, in
 	// we need to determine the status of the line "x = lineX"
 	// it will either be a) already a slab line, b) nonexistent, but lying in an existing slab, or c) nonexistent, and lying in whitespace
 
-	if (this->RBTSlabLines.search(lineX) == this->RBTSlabLines.nil)
+	if (this->RBTSlabLines->search(lineX) == this->RBTSlabLines->nil)
 	{
 		// either b) or c)
 
@@ -601,23 +603,23 @@ void SlabContainer::prepareBoundLineGivenXPoint(int lineX, bool isLeftOfBBox, in
 
 bool slabSort(Slab* slab1, Slab* slab2) { return slab1->leftX < slab2->leftX; }
 
-void SlabContainer::mergeSlabs(Slab& slab1, Slab& slab2)
+void SlabContainer::mergeSlabs(Slab* slab1, Slab* slab2)
 {
-	slab1.rightX = slab2.rightX;
-	this->deleteSlab(slab2.leftX);
-	this->RBTSlabLines.insert(slab1.rightX);
+	slab1->rightX = slab2->rightX;
+	this->deleteSlab(slab2->leftX);
+	this->RBTSlabLines->insert(slab1->rightX);
 }
 
-void SlabContainer::deleteShape(Shape& shape)
+void SlabContainer::deleteShape(Shape* shape)
 {
-	RedBlackTree* rbt = &this->RBTSlabLines;
+	RedBlackTree* rbt = this->RBTSlabLines;
 	vector<Slab*> oldSlabs;
 
-	for (int i = 0, len = shape.slabs.size(); i < len; i++)
+	for (int i = 0, len = shape->slabs.size(); i < len; i++)
 	{
 		Slab* rightSlab = &nilSlab;
-		Slab* slab = shape.slabs[i];
-		vector<int>::iterator it = find(slab->shapeIds.begin(), slab->shapeIds.end(), shape.id);
+		Slab* slab = shape->slabs[i];
+		vector<int>::iterator it = find(slab->shapeIds.begin(), slab->shapeIds.end(), shape->id);
 
 		if (this->SlabLinesByLeft.find(slab->leftX) == this->SlabLinesByLeft.end())
 		{
@@ -632,7 +634,7 @@ void SlabContainer::deleteShape(Shape& shape)
 			{
 				Shape* sh = this->ShapeMembers[slab->shapeIds[j]];
 				if (sh == nullptr) {
-					this->ShapeMembers.erase(sh->id);
+					this->ShapeMembers.erase(slab->shapeIds[j]);
 					continue;
 				}
 				vector<Slab*>::iterator it2 = find(sh->slabs.begin(), sh->slabs.end(), slab);
@@ -663,7 +665,7 @@ void SlabContainer::deleteShape(Shape& shape)
 			}
 			if (!allAreTrue)
 			{
-				rbt->deleteNode(*(rbt->search(slab->leftX)));
+				rbt->deleteNode(rbt->search(slab->leftX));
 			}
 			this->SlabLinesByLeft.erase(slab->leftX);
 		}
@@ -691,7 +693,7 @@ void SlabContainer::deleteShape(Shape& shape)
 		}
 		if (!rightSlabHasShapes)
 		{
-			rbt->deleteNode(*(rbt->search(slab->rightX)));
+			rbt->deleteNode(rbt->search(slab->rightX));
 		}
 
 		vector<Slab*> newSlabs;
@@ -709,9 +711,10 @@ void SlabContainer::deleteShape(Shape& shape)
 					continue;
 				}
 				if (this->ShapeMembers[oSlab->shapeIds[j]] == nullptr) {
+					this->ShapeMembers.erase(oSlab->shapeIds[j]);
 					continue;
 				}
-				mySlab->addShape(*(this->ShapeMembers[oSlab->shapeIds[j]]));
+				mySlab->addShape(this->ShapeMembers[oSlab->shapeIds[j]]);
 				this->ShapeMembers[oSlab->shapeIds[j]]->slabs.push_back(mySlab);
 			}
 
@@ -778,12 +781,12 @@ void SlabContainer::deleteShape(Shape& shape)
 
 				if (sameShapes)
 				{
-					this->mergeSlabs(*prevSlab, *thisSlab);
+					this->mergeSlabs(prevSlab, thisSlab);
 					lastSlab = prevSlab;
 				}
 			}
 		}
 	}
 
-	this->ShapeMembers.erase(shape.id);
+	this->ShapeMembers.erase(shape->id);
 }

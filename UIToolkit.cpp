@@ -1117,11 +1117,6 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 	pageX = x2;
 	pageY = y2;
 
-	RedBlackTree* rbt = &(mySlabContainer->RBTSlabLines);
-	RedBlackNode* node = rbt->closest(x2);
-	Slab* slab = &nilSlab;
-	bool success = false, slabExists = false;
-
 	MainWindow::success = false;
 
 	bool ContextMenuWasVisible = false;
@@ -1226,60 +1221,68 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 		}
 	}
 
-	if (node->key > x2)
-	{
-		int nodeKey = rbt->predecessor(node)->key;
-		slabExists = mySlabContainer->SlabLinesByLeft.find(nodeKey) != mySlabContainer->SlabLinesByLeft.end();
-		if (slabExists)
-		{
-			slab = mySlabContainer->SlabLinesByLeft[nodeKey];
-		}
-	}
-	else
-	{
-		slabExists = mySlabContainer->SlabLinesByLeft.find(node->key) != mySlabContainer->SlabLinesByLeft.end();
-		if (slabExists)
-		{
-			slab = mySlabContainer->SlabLinesByLeft[node->key];
-		}
-	}
+	RedBlackTree* rbt = mySlabContainer->RBTSlabLines;
 
-	if (slabExists && x2 >= slab->leftX && x2 <= slab->rightX)
-	{
-		rbt = slab->RBTRegions;
-		node = rbt->closest(y2);
+	if (rbt != nullptr) {
+		RedBlackNode* node = rbt->closest(x2);
+		Slab* slab = &nilSlab;
+		bool success = false, slabExists = false;
 
-		bool regionExists;
-		Region* region = &nilRegion;
-		if (node->key > y2)
+		if (node->key > x2)
 		{
-			int regionKey = rbt->predecessor(node)->key;
-			regionExists = slab->RegionsByTop.find(regionKey) != slab->RegionsByTop.end();
-			if (regionExists)
+			int nodeKey = rbt->predecessor(node)->key;
+			slabExists = mySlabContainer->SlabLinesByLeft.find(nodeKey) != mySlabContainer->SlabLinesByLeft.end();
+			if (slabExists)
 			{
-				region = slab->RegionsByTop[regionKey];
+				slab = mySlabContainer->SlabLinesByLeft[nodeKey];
 			}
 		}
 		else
 		{
-			regionExists = slab->RegionsByTop.find(node->key) != slab->RegionsByTop.end();
-			if (regionExists)
+			slabExists = mySlabContainer->SlabLinesByLeft.find(node->key) != mySlabContainer->SlabLinesByLeft.end();
+			if (slabExists)
 			{
-				region = slab->RegionsByTop[node->key];
+				slab = mySlabContainer->SlabLinesByLeft[node->key];
 			}
 		}
 
-		if (regionExists && y2 >= region->topY && y2 <= region->bottomY)
+		if (slabExists && x2 >= slab->leftX && x2 <= slab->rightX)
 		{
-			selRegion = region;
+			rbt = slab->RBTRegions;
+			node = rbt->closest(y2);
 
-			MainWindow::slabLeft = slab->leftX;
-			MainWindow::slabRight = slab->rightX;
+			bool regionExists;
+			Region* region = &nilRegion;
+			if (node->key > y2)
+			{
+				int regionKey = rbt->predecessor(node)->key;
+				regionExists = slab->RegionsByTop.find(regionKey) != slab->RegionsByTop.end();
+				if (regionExists)
+				{
+					region = slab->RegionsByTop[regionKey];
+				}
+			}
+			else
+			{
+				regionExists = slab->RegionsByTop.find(node->key) != slab->RegionsByTop.end();
+				if (regionExists)
+				{
+					region = slab->RegionsByTop[node->key];
+				}
+			}
 
-			MainWindow::regionTop = region->topY;
-			MainWindow::regionBottom = region->bottomY;
+			if (regionExists && y2 >= region->topY && y2 <= region->bottomY)
+			{
+				selRegion = region;
 
-			MainWindow::success = true;
+				MainWindow::slabLeft = slab->leftX;
+				MainWindow::slabRight = slab->rightX;
+
+				MainWindow::regionTop = region->topY;
+				MainWindow::regionBottom = region->bottomY;
+
+				MainWindow::success = true;
+			}
 		}
 	}
 
@@ -1405,30 +1408,28 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 }
 
 void MainWindow::OnLButtonUp() {
-	if (dragging && currentControl != nullptr) {
-		Shape* newShape = new Shape;
+	if (dragging) {
+		if (currentControl != nullptr) {
+			Shape* newShape = new Shape;
 
-		for (int i = 0, len = selRegion->shapes.size(); i < len; i++) {
-			if (selRegion->shapes[i]->control == currentControl) {
-				mySlabContainer->deleteShape(*selRegion->shapes[i]);
+			mySlabContainer->deleteShape(currentControl->ptrShape);
+
+			selRegion = nullptr;
+
+			int newShapeId = mySlabContainer->NextAvailableShapeId++;
+			newShape->id = newShapeId;
+			newShape->x1 = currentControl->x;
+			newShape->x2 = currentControl->x + currentControl->width;
+			newShape->y1 = currentControl->y;
+			newShape->y2 = currentControl->y + currentControl->height;
+			newShape->control = currentControl;
+
+			mySlabContainer->ShapeMembers[newShapeId] = newShape;
+			mySlabContainer->addShape(newShape);
+
+			if (currentControl->type == FormMenuBar) {
+				((MenuBar*)currentControl)->RepositionRelativeToParent();
 			}
-		}
-
-		selRegion = nullptr;
-
-		int newShapeId = mySlabContainer->NextAvailableShapeId++;
-		newShape->id = newShapeId;
-		newShape->x1 = currentControl->x;
-		newShape->x2 = currentControl->x + currentControl->width;
-		newShape->y1 = currentControl->y;
-		newShape->y2 = currentControl->y + currentControl->height;
-		newShape->control = currentControl;
-
-		mySlabContainer->ShapeMembers[newShapeId] = newShape;
-		mySlabContainer->addShape(*newShape);
-
-		if (currentControl->type == FormMenuBar) {
-			((MenuBar*)currentControl)->RepositionRelativeToParent();
 		}
 		dragging = false;
 		currentControl = nullptr;

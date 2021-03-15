@@ -37,12 +37,12 @@ public:
 	map<int, Region*> RegionsByTop;
 	vector<int> shapeIds;
 	int shapeCount = 0;
-	Region *makeRegion(int topY, int bottomY, vector<Shape*> &shapesToCopy);
+	Region *makeRegion(int topY, int bottomY, vector<Shape*> shapesToCopy);
 	horizontalLineCheckResponse checkIfHorizontalLineLiesInExistingRegion(int lineY);
 	void deleteRegion(int topY);
 	void splitRegion(int topY, int splitY);
 	void prepareBoundLineGivenYPoint(int lineY, bool isTopOfBBox, int edgeWeMightNeed, int shapeId);
-	void addShape(Shape &shape);
+	void addShape(Shape *shape);
 	~Slab();
 };
 extern Slab nilSlab;
@@ -52,8 +52,8 @@ class Shape
 public:
 	vector<Slab*> slabs; // must delete Slabs later
 	int id, x1, x2, y1, y2;
-	D2D1_RECT_F *rect;
-	FormControl* control;
+	D2D1_RECT_F *rect = nullptr;
+	FormControl* control = nullptr;
 };
 
 class Region
@@ -74,18 +74,18 @@ enum SlabLineType
 class SlabContainer
 {
 public:
-	RedBlackTree RBTSlabLines;
+	RedBlackTree *RBTSlabLines = new RedBlackTree;
 	map<int, Slab*> SlabLinesByLeft;
 	map<int, Shape*> ShapeMembers;
 	int NextAvailableShapeId = 1;
 
-	void mergeSlabs(Slab &slab1, Slab &slab2);
-	void deleteShape(Shape &shape);
-	void preprocessSubdivision(vector<Shape*> &shapesToAdd, char oType, Slab &slab);
-	void addShape(Shape &shape);
+	void mergeSlabs(Slab *slab1, Slab *slab2);
+	void deleteShape(Shape *shape);
+	void preprocessSubdivision(vector<Shape*> shapesToAdd, char oType, Slab &slab);
+	void addShape(Shape *shape);
 	void copyRegions(RedBlackTree *src, RedBlackTree *dest);
 	Slab *cloneSlab(int leftX, int rightX, Slab &oldSlab);
-	Slab *makeSlab(int leftX, int rightX, map<int, Region*> &regionsToPaste, int shapeCount, vector<int> &shapeIds);
+	Slab *makeSlab(int leftX, int rightX, map<int, Region*> regionsToPaste, int shapeCount, vector<int> shapeIds);
 	void deleteSlab(int leftX);//, bool keepRegions) {};
 	void splitSlab(int leftX, int splitX);
 	struct verticalLineCheckResponse

@@ -39,5 +39,5 @@ public:
 	RedBlackNode* predecessor(RedBlackNode* x);
 	RedBlackNode* successor(RedBlackNode* x);
 	void deleteNodeFixup(RedBlackNode* x);
-	RedBlackNode* deleteNode(RedBlackNode& z);
+	RedBlackNode* deleteNode(RedBlackNode* z);
 };
