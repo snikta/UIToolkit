@@ -25,6 +25,9 @@ int clamp(int value, int min, int max) {
 	return min(max(value, min), max);
 }
 
+bool dragging = false;
+float prevX;
+float prevY;
 float pageX = 0.0;
 float pageY = 0.0;
 SlabContainer *mySlabContainer = new SlabContainer;
@@ -215,6 +218,7 @@ class BitmapImage : public FormControl {
 public:
 	string src;
 	BitmapImage(string src, float x, float y, float width, float height) : FormControl("", x, y) {
+		this->type = FormBitmapImage;
 		this->src = src;
 		this->width = width;
 		this->height = height;
@@ -243,6 +247,7 @@ public:
 	MenuBar* parent = nullptr;
 	bool visible = false;
 	MenuBar(float x, float y) : FormControl("", x, y) {
+		type = FormMenuBar;
 		width = 0;
 		height = 0;
 		setBackColor(Color(211.0, 211.0, 211.0, 1.0));
@@ -291,6 +296,20 @@ public:
 		width = max(width, metrics.widthIncludingTrailingWhitespace);
 		height = items.size() * getItemHeight();
 	}
+	void RepositionRelativeToParent() {
+		MenuBar* parentMenu = parent;
+		for (int i = 0, len = getItemCount(); i < len; i++) {
+			MenuBarItem& menuBarItem = getItem(i);
+			if (menuBarItem.menuBar != nullptr) {
+				menuBarItem.menuBar->RepositionRelativeToParent();
+			}
+		}
+		while (parentMenu != nullptr) {
+			x = parentMenu->x + parentMenu->width;
+			y = parentMenu->y + parentMenu->getMenuBarItemIndex(this) * parentMenu->getItemHeight();
+			parentMenu = parentMenu->parent;
+		}
+	}
 	void Render() {
 		SetFillColor(getBackColor());
 		FillRect(x, y, width, height);
@@ -306,7 +325,9 @@ public:
 			if (items[i].menuBar != nullptr) {
 				if (items[i].menuBar->visible) {
 					items[i].menuBar->x = x + width;
-					items[i].menuBar->Render();
+					if (!dragging) {
+						items[i].menuBar->Render();
+					}
 				}
 			}
 		}
@@ -534,6 +555,9 @@ public:
 	}
 };
 
+BitmapImage* BitmapImage1 = nullptr;
+MenuBar* ContextMenu1 = nullptr;
+FormControl* currentControl = nullptr;
 Textbox* TextboxInFocus = nullptr;
 ComboBox* ComboBoxInFocus = nullptr;
 ComboBox* ComboBox1 = nullptr;
@@ -639,9 +663,6 @@ void MainWindow::DiscardGraphicsResources()
 	SafeRelease(&pRenderTarget);
 }
 
-BitmapImage* BitmapImage1 = nullptr;
-MenuBar* ContextMenu1 = nullptr;
-
 void SelectImage(FormControl* control) {
 	float width;
 	float height;
@@ -673,8 +694,10 @@ void SelectImage(FormControl* control) {
 	BitmapImage1->height = height;
 }
 
+Textbox* Textbox1;
+
 void addComboBoxItem(FormControl* control) {
-	ComboBox1->options.push_back(TextboxInFocus->value);
+	ComboBox1->options.push_back(Textbox1->value);
 }
 
 void removeComboBoxItem(FormControl* control) {
@@ -943,7 +966,7 @@ void MainWindow::OnPaint()
 			ComboBox1->setBackColor(Color(0.0, 0.0, 128.0, 1.0));
 			ComboBox1->setForeColor(Color(255.0, 255.0, 255.0, 1.0));
 			Label* Label2 = new Label("New Item:", 10.0F, y);
-			Textbox* Textbox1 = new Textbox("Textbox1", Label2->x + Label2->width + 10.0F, y);
+			Textbox1 = new Textbox("Textbox1", Label2->x + Label2->width + 10.0F, y);
 			Textbox1->setBackColor(Color(255.0, 255.0, 0.0, 1.0));
 			Label2->target = Textbox1;
 			Textbox1->setFontName("Times New Roman");
@@ -1101,10 +1124,9 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 
 	MainWindow::success = false;
 
-	if (ContextMenu1 != nullptr && ContextMenu1->visible) {
-		if (std::find(visibleMenus.begin(), visibleMenus.end(), ContextMenu1) == visibleMenus.end()) {
-			visibleMenus.push_back(ContextMenu1);
-		}
+	bool ContextMenuWasVisible = false;
+	if (ContextMenu1 != nullptr) {
+		ContextMenuWasVisible = ContextMenu1->visible;
 	}
 
 	for (int i = 0, len = visibleMenus.size(); i < len; i++) {
@@ -1142,7 +1164,6 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 							parentMenuBar->visible = true;
 							parentMenuBar = parentMenuBar->parent;
 						}
-						return;
 					}
 					else {
 						visibleMenus.clear();
@@ -1157,8 +1178,16 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 							parentMenuBar->visible = true;
 							parentMenuBar = parentMenuBar->parent;
 						}
-						return;
 					}
+					if (ContextMenuWasVisible) {
+						if (ContextMenu1 != nullptr) {
+							if (std::find(visibleMenus.begin(), visibleMenus.end(), ContextMenu1) == visibleMenus.end()) {
+								visibleMenus.push_back(ContextMenu1);
+							}
+							ContextMenu1->visible = true;
+						}
+					}
+					return;
 				}
 			}
 		}
@@ -1181,6 +1210,7 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 						if (std::find(visibleMenus.begin(), visibleMenus.end(), menuBarItem.menuBar) == visibleMenus.end()) {
 							visibleMenus.push_back(menuBarItem.menuBar);
 						}
+						menuBar->setHoveredItem(menuBarItemIndex);
 						for (int j = 0, jLen = menuBar->getItemCount(); j < jLen; j++) {
 							if (j != menuBarItemIndex) {
 								MenuBar* itemChildMenu = menuBar->getItem(j).menuBar;
@@ -1252,6 +1282,22 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 			MainWindow::success = true;
 		}
 	}
+
+	if (ContextMenuWasVisible) {
+		if (ContextMenu1 != nullptr) {
+			if (std::find(visibleMenus.begin(), visibleMenus.end(), ContextMenu1) == visibleMenus.end()) {
+				visibleMenus.push_back(ContextMenu1);
+			}
+			ContextMenu1->visible = true;
+		}
+	}
+
+	if (currentControl != nullptr) {
+		currentControl->x += pageX - prevX;
+		currentControl->y += pageY - prevY;
+	}
+	prevX = pixelX;
+	prevY = pixelY;
 }
 
 void MainWindow::OnRButtonDown(int pixelX, int pixelY, DWORD flags) {
@@ -1307,37 +1353,87 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 				if (toolbar != nullptr && toolbar->getHoveredIcon() != -1) {
 					ToolbarIcon& icon = toolbar->getIcon(toolbar->getHoveredIcon());
 					if (icon.clickHandler && icon.clickHandler != nullptr) {
-						icon.clickHandler(icon);
+						if (!dragging) {
+							icon.clickHandler(icon);
+						}
 					}
 				}
 			}
 			if (control->clickHandler != nullptr) {
-				control->clickHandler(control);
+				if (!dragging) {
+					control->clickHandler(control);
+				}
 			}
 			if (control->type == FormComboBox) {
 				ComboBoxInFocus = (ComboBox*)control;
 			}
 			if (control->type == FormTextbox) {
-				TextboxInFocus = (Textbox*)control;
-				int charIndex = 0;
-				int x = TextboxInFocus->x + 10;
-				while (charIndex < TextboxInFocus->value.size() && x < (TextboxInFocus->x + TextboxInFocus->width)) {
-					x = TextboxInFocus->x + 10 + MeasureText(TextboxInFocus->value.substr(0, charIndex + 1), TextboxInFocus->m_pTextFormat).widthIncludingTrailingWhitespace;
-					charIndex++;
-					if (x >= pixelX) {
-						charIndex--;
-						break;
+				if (!dragging) {
+					TextboxInFocus = (Textbox*)control;
+					int charIndex = 0;
+					int x = TextboxInFocus->x + 10;
+					while (charIndex < TextboxInFocus->value.size() && x < (TextboxInFocus->x + TextboxInFocus->width)) {
+						x = TextboxInFocus->x + 10 + MeasureText(TextboxInFocus->value.substr(0, charIndex + 1), TextboxInFocus->m_pTextFormat).widthIncludingTrailingWhitespace;
+						charIndex++;
+						if (x >= pixelX) {
+							charIndex--;
+							break;
+						}
 					}
+					TextboxInFocus->charIndex = clamp(charIndex, 0, TextboxInFocus->value.size());
 				}
-				TextboxInFocus->charIndex = clamp(charIndex, 0, TextboxInFocus->value.size());
 			}
 		}
 	}
 
+	if (selRegion != nullptr) {
+		for (int i = 0, len = selRegion->shapes.size(); i < len; i++) {
+			FormControl* control = selRegion->shapes[i]->control;
+			if (!(pageX >= control->x && pageX <= (control->x + control->width) && pageY >= control->y && pageY <= (control->y + control->height))) {
+				continue;
+			}
+			currentControl = control;
+		}
+	}
+	if (currentControl != nullptr) {
+		dragging = true;
+	}
+
 	OnPaint();
+	prevX = pixelX;
+	prevY = pixelY;
 }
 
 void MainWindow::OnLButtonUp() {
+	if (dragging && currentControl != nullptr) {
+		Shape* newShape = new Shape;
+
+		for (int i = 0, len = selRegion->shapes.size(); i < len; i++) {
+			if (selRegion->shapes[i]->control == currentControl) {
+				mySlabContainer->deleteShape(*selRegion->shapes[i]);
+			}
+		}
+
+		selRegion = nullptr;
+
+		int newShapeId = mySlabContainer->NextAvailableShapeId++;
+		newShape->id = newShapeId;
+		newShape->x1 = currentControl->x;
+		newShape->x2 = currentControl->x + currentControl->width;
+		newShape->y1 = currentControl->y;
+		newShape->y2 = currentControl->y + currentControl->height;
+		newShape->control = currentControl;
+
+		mySlabContainer->ShapeMembers[newShapeId] = newShape;
+		mySlabContainer->addShape(*newShape);
+
+		if (currentControl->type == FormMenuBar) {
+			((MenuBar*)currentControl)->RepositionRelativeToParent();
+		}
+		dragging = false;
+		currentControl = nullptr;
+	}
+	
 	if (selRegion != nullptr) {
 		for (int i = 0, len = selRegion->shapes.size(); i < len; i++)
 		{
