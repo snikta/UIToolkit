@@ -238,6 +238,7 @@ class MenuBar : public FormControl {
 private:
 	vector<MenuBarItem> items;
 	float itemHeight;
+	int hoveredItem = -1;
 public:
 	MenuBar* parent = nullptr;
 	bool visible = false;
@@ -248,6 +249,20 @@ public:
 		setForeColor(Color(0.0, 0.0, 0.0, 1.0));
 		setItemHeight(30.0);
 	};
+	int getMenuBarItemIndex(MenuBar *menuBar) {
+		for (int i = 0, len = items.size(); i < len; i++) {
+			if (items[i].menuBar == menuBar) {
+				return i;
+			}
+		}
+		return -1;
+	}
+	int getHoveredItem() {
+		return hoveredItem;
+	}
+	void setHoveredItem(int newHoveredItem) {
+		hoveredItem = clamp(newHoveredItem, -1, items.size());
+	}
 	int getItemCount() {
 		return items.size();
 	}
@@ -281,6 +296,10 @@ public:
 		FillRect(x, y, width, height);
 		int menuY = y;
 		for (int i = 0, len = items.size(); i < len; i++) {
+			if (i == getHoveredItem()) {
+				SetFillColor(Color(161.0, 161.0, 161.0, 1.0));
+				FillRect(x, menuY, width, getItemHeight());
+			}
 			SetFillColor(getForeColor());
 			FillText(items[i].label, x, menuY, m_pTextFormat);
 			menuY += getItemHeight();
@@ -531,6 +550,7 @@ class MainWindow : public BaseWindow<MainWindow>
 	void    Resize();
 	void    OnMouseMove(int pixelX, int pixelY, DWORD flags);
 	void    OnLButtonDown(int pixelX, int pixelY, DWORD flags);
+	void    OnRButtonDown(int pixelX, int pixelY, DWORD flags);
 	void	OnLButtonUp();
 
 public:
@@ -619,7 +639,8 @@ void MainWindow::DiscardGraphicsResources()
 	SafeRelease(&pRenderTarget);
 }
 
-BitmapImage* BitmapImage1;
+BitmapImage* BitmapImage1 = nullptr;
+MenuBar* ContextMenu1 = nullptr;
 
 void SelectImage(FormControl* control) {
 	float width;
@@ -874,6 +895,34 @@ void MainWindow::OnPaint()
 			MenuBar1->AddItem("Table", TableMenu);
 			MenuBar1->AddItem("Help", HelpMenu);
 
+			ContextMenu1 = new MenuBar(10.0F, y);
+			MenuBar* CopyMenu = new MenuBar(10.0F, y);
+			CopyMenu->AddItem("Image");
+			CopyMenu->AddItem("Text");
+			MenuBar* PasteMenu = new MenuBar(10.0F, y);
+			PasteMenu->AddItem("HTML");
+			PasteMenu->AddItem("RTF");
+			MenuBar* DocsMenu = new MenuBar(10.0F, y);
+			DocsMenu->AddItem("Wrapped Image");
+			DocsMenu->AddItem("Chart");
+			DocsMenu->AddItem("Rich Text");
+			DocsMenu->AddItem("Table");
+			MenuBar* SheetsMenu = new MenuBar(10.0F, y);
+			SheetsMenu->AddItem("Formula");
+			SheetsMenu->AddItem("Value");
+			SheetsMenu->AddItem("Equation");
+			SheetsMenu->AddItem("Pivot Table");
+			MenuBar* GoogleMenu2 = new MenuBar(10.0F, y);
+			GoogleMenu2->AddItem("Docs", DocsMenu);
+			GoogleMenu2->AddItem("Sheets", SheetsMenu);
+			ContextMenu1->AddItem("Cut");
+			ContextMenu1->AddItem("Copy", CopyMenu);
+			ContextMenu1->AddItem("Paste", PasteMenu);
+			ContextMenu1->AddItem("Duplicate");
+			ContextMenu1->AddItem("Delete");
+			ContextMenu1->AddItem("Select All");
+			ContextMenu1->AddItem("Google", GoogleMenu2);
+
 			y += MenuBar1->height + 10.0;
 			Toolbar* Toolbar1 = new Toolbar(10.0F, y);
 			Toolbar1->AddIcon("Back", "icons/back.png", ClickBack);
@@ -983,6 +1032,10 @@ void MainWindow::OnPaint()
 			}
 		}
 
+		if (ContextMenu1->visible) {
+			ContextMenu1->Render();
+		}
+
 		hr = pRenderTarget->EndDraw();
 		if (FAILED(hr) || hr == D2DERR_RECREATE_TARGET)
 		{
@@ -1011,7 +1064,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
 	MainWindow win;
 
-	if (!win.Create(L"Circle", WS_OVERLAPPEDWINDOW))
+	if (!win.Create(L"UIToolkit", WS_OVERLAPPEDWINDOW))
 	{
 		return 0;
 	}
@@ -1048,11 +1101,19 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 
 	MainWindow::success = false;
 
+	if (ContextMenu1 != nullptr && ContextMenu1->visible) {
+		if (std::find(visibleMenus.begin(), visibleMenus.end(), ContextMenu1) == visibleMenus.end()) {
+			visibleMenus.push_back(ContextMenu1);
+		}
+	}
+
 	for (int i = 0, len = visibleMenus.size(); i < len; i++) {
 		visibleMenus[i]->visible = false;
+		visibleMenus[i]->setHoveredItem(-1);
 		for (int j = 0, jLen = visibleMenus[i]->getItemCount(); j < jLen; j++) {
 			if (visibleMenus[i]->getItem(j).menuBar != nullptr) {
 				visibleMenus[i]->getItem(j).menuBar->visible = false;
+				visibleMenus[i]->getItem(j).menuBar->setHoveredItem(-1);
 			}
 		}
 	}
@@ -1067,6 +1128,7 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 			for (int j = 0, jLen = visibleMenu->getItemCount(); j < jLen; j++) {
 				if (pageY >= (visibleMenu->y + j * visibleMenu->getItemHeight()) && pageY <= (visibleMenu->y + (j + 1) * visibleMenu->getItemHeight())) {
 					MenuBarItem menuBarItem = visibleMenu->getItem(j);
+					visibleMenu->setHoveredItem(j);
 					if (menuBarItem.menuBar != nullptr) {
 						visibleMenus.clear();
 						menuBarItem.menuBar->x = visibleMenu->x + visibleMenu->width;
@@ -1074,6 +1136,9 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 						MenuBar* parentMenuBar = menuBarItem.menuBar;
 						while (parentMenuBar != nullptr) {
 							visibleMenus.push_back(parentMenuBar);
+							if (parentMenuBar->parent != nullptr) {
+								parentMenuBar->parent->setHoveredItem(parentMenuBar->parent->getMenuBarItemIndex(parentMenuBar));
+							}
 							parentMenuBar->visible = true;
 							parentMenuBar = parentMenuBar->parent;
 						}
@@ -1083,9 +1148,12 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 						visibleMenus.clear();
 						visibleMenus.push_back(visibleMenu);
 						visibleMenu->visible = true;
-						MenuBar* parentMenuBar = visibleMenu->parent;
+						MenuBar* parentMenuBar = visibleMenu;
 						while (parentMenuBar != nullptr) {
 							visibleMenus.push_back(parentMenuBar);
+							if (parentMenuBar->parent != nullptr) {
+								parentMenuBar->parent->setHoveredItem(parentMenuBar->parent->getMenuBarItemIndex(parentMenuBar));
+							}
 							parentMenuBar->visible = true;
 							parentMenuBar = parentMenuBar->parent;
 						}
@@ -1118,10 +1186,7 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 								MenuBar* itemChildMenu = menuBar->getItem(j).menuBar;
 								if (itemChildMenu != nullptr) {
 									itemChildMenu->visible = false;
-									/*auto it = std::find(visibleMenus.begin(), visibleMenus.end(), itemChildMenu);
-									if (it != visibleMenus.end()) {
-										visibleMenus.erase(it);
-									}*/
+									itemChildMenu->setHoveredItem(-1);
 								}
 							}
 						}
@@ -1189,7 +1254,16 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 	}
 }
 
+void MainWindow::OnRButtonDown(int pixelX, int pixelY, DWORD flags) {
+	ContextMenu1->x = pixelX;
+	ContextMenu1->y = pixelY;
+	ContextMenu1->visible = true;
+	OnPaint();
+}
+
 void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
+	ContextMenu1->visible = false;
+	ContextMenu1->setHoveredItem(-1);
 	for (int i = 0, len = controls.size(); i < len; i++) {
 		FormControl* control = controls[i];
 		if (control->type == FormComboBox && control->focused == true) {
@@ -1226,7 +1300,6 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 						ComboBoxInFocus = (ComboBox*)label->target;
 						ComboBoxInFocus->toggled = true;
 					}
-					OnPaint();
 				}
 			}
 			else if (control->type == FormToolbar) {
@@ -1257,10 +1330,11 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags) {
 					}
 				}
 				TextboxInFocus->charIndex = clamp(charIndex, 0, TextboxInFocus->value.size());
-				OnPaint();
 			}
 		}
 	}
+
+	OnPaint();
 }
 
 void MainWindow::OnLButtonUp() {
@@ -1368,6 +1442,10 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_LBUTTONDOWN:
 		OnLButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), (DWORD)wParam);
+		return 0;
+
+	case WM_RBUTTONDOWN:
+		OnRButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), (DWORD)wParam);
 		return 0;
 
 	case WM_LBUTTONUP:
